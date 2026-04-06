@@ -1,6 +1,6 @@
 {
 	"name": "pi-free",
-	"version": "1.0.5",
+	"version": "1.0.6",
 	"type": "module",
 	"description": "AIO Free AI models for Pi - Access free models from Kilo, Zen, OpenRouter, NVIDIA, Cline, Mistral, and Ollama",
 	"keywords": [
@@ -33,6 +33,7 @@
 		"providers/**/*.ts",
 		"lib/**/*.ts",
 		"usage/**/*.ts",
+		"provider-failover/**/*.ts",
 		"config.ts",
 		"constants.ts",
 		"provider-factory.ts",
