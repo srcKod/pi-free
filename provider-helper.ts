@@ -11,6 +11,7 @@ import type {
 	ExtensionAPI,
 	ProviderModelConfig,
 } from "@mariozechner/pi-coding-agent";
+import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { saveConfig } from "./config.ts";
 import { createLogger } from "./lib/logger.ts";
 import { enhanceModelNameWithCodingIndex } from "./provider-failover/hardcoded-benchmarks.ts";
@@ -18,7 +19,8 @@ import {
 	handleProviderError,
 	isProviderExhausted,
 	resetFailureCount,
-} from "./provider-failover/index.js";
+} from "./provider-failover/index.ts";
+import { autoFailover, type AutoSwitchConfig } from "./provider-failover/auto-switch.ts";
 import { incrementRequestCount } from "./usage/metrics.ts";
 import { incrementModelRequestCount } from "./usage/tracking.ts";
 
@@ -49,6 +51,8 @@ export interface ProviderSetupConfig {
 			ui: { notify: (m: string, t: "info" | "warning" | "error") => void };
 		},
 	) => Promise<boolean>;
+	/** Auto-switch configuration for failover. If enabled, will automatically switch providers on rate limits. */
+	autoSwitch?: Partial<AutoSwitchConfig>;
 }
 
 export interface StoredModels {
@@ -252,12 +256,14 @@ export function setupProvider(
 				{
 					provider: providerId,
 					isPaidMode: currentShowPaid,
+					autoSwitch: config.autoSwitch,
 				},
 				pi,
 				ctx as {
 					ui: {
 						notify: (m: string, t: "info" | "warning" | "error") => void;
 					};
+					model?: { provider?: string; id?: string };
 					session?: { id?: string };
 				},
 			);
@@ -273,6 +279,27 @@ export function setupProvider(
 				}
 			} else if (result.action === "fail") {
 				ctx.ui.notify(result.message, "error");
+			} else if (result.action === "switch") {
+				// Auto-switch to another provider on rate limit
+				if (ctx.model) {
+					const switchResult = await autoFailover(
+						errorMsg,
+						ctx.model as any,
+						pi,
+						ctx as ExtensionContext,
+						config.autoSwitch ?? {},
+					);
+					if (switchResult.switched) {
+						ctx.ui.notify(switchResult.message, "info");
+					} else {
+						ctx.ui.notify(
+							`${result.message} (${switchResult.message})`,
+							"warning",
+						);
+					}
+				} else {
+					ctx.ui.notify(result.message, "warning");
+				}
 			}
 
 			// Don't reset failure count on error

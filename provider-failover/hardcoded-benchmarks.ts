@@ -9842,11 +9842,29 @@ export const HARDCODED_BENCHMARKS: Record<string, HardcodedBenchmark> = {
 /**
  * Find benchmark data by model name
  */
+/**
+ * Normalize a model ID/name for benchmark lookup.
+ * Only strips trailing "free" suffix - preserves the core model name.
+ */
+function normalizeForBenchmark(input: string): string {
+	return (
+		input
+			.toLowerCase()
+			// Only remove "free" at the end (with optional separator)
+			.replace(/[-_]?free$/i, "")
+			// Remove trailing separators that might remain
+			.replace(/[-_]+$/, "")
+	);
+}
+
 export function findHardcodedBenchmark(
 	modelName: string,
 	modelId: string,
 ): HardcodedBenchmark | null {
-	const search = `${modelName} ${modelId}`.toLowerCase();
+	// Normalize both inputs for matching
+	const normalizedName = normalizeForBenchmark(modelName);
+	const normalizedId = normalizeForBenchmark(modelId);
+	const search = `${normalizedName} ${normalizedId}`.toLowerCase();
 
 	// Direct lookup
 	for (const [key, data] of Object.entries(HARDCODED_BENCHMARKS)) {
@@ -9855,7 +9873,7 @@ export function findHardcodedBenchmark(
 		}
 	}
 
-	// Variant matching
+	// Variant matching - normalize variants too
 	const variants: Record<string, string[]> = {
 		"gpt-4o": ["gpt-4o", "gpt-4-o"],
 		"gpt-4": ["gpt-4", "gpt4"],
@@ -9871,12 +9889,16 @@ export function findHardcodedBenchmark(
 		"qwen2.5-72b": ["qwen2.5-72b", "qwen-2.5-72b"],
 		"deepseek-v3": ["deepseek-v3", "deepseekv3", "deepseek-chat"],
 		"mimo-v2-pro": ["mimo-v2-pro", "mimo-v2-pro-free", "mimo-pro"],
+		"mimo-v2-omni": ["mimo-v2-omni", "mimo-v2-omni-free", "mimo-omni"],
+		"mimo-v2-flash": ["mimo-v2-flash", "mimo-v2-flash-free", "mimo-flash"],
 		"big-pickle": ["big-pickle", "bigpickle"],
 		"minimax-m2.5": ["minimax-m2.5", "minimax-m2.5-free", "minimax-m25"],
+		"trinity-large-preview": ["trinity-large-preview", "trinity-large", "trinity-preview", "arcee-trinity"],
+		"nemotron-3-super": ["nemotron-3-super", "nemotron-super", "nemotron-3"],
 	};
 
 	for (const [canonical, names] of Object.entries(variants)) {
-		if (names.some((n) => search.includes(n.toLowerCase()))) {
+		if (names.some((n) => normalizeForBenchmark(n).length > 0 && search.includes(normalizeForBenchmark(n)))) {
 			return HARDCODED_BENCHMARKS[canonical] || null;
 		}
 	}
