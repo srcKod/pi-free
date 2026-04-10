@@ -80,6 +80,7 @@ function openBrowser(url: string): void {
 			spawn("cmd", ["/c", "start", "", url], {
 				detached: true,
 				shell: false,
+				windowsHide: true,
 			}).unref();
 		} else if (process.platform === "darwin") {
 			spawn("open", [url], { detached: true }).unref();
