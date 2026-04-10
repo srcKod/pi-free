@@ -263,18 +263,25 @@ export async function loginQwen(
 		verificationUri: deviceAuth.verification_uri,
 	});
 
-	// 3. Show auth URL to user
+	// 3. Build complete auth URL with client_id (Qwen website requires it)
+	const authUrl = new URL(deviceAuth.verification_uri_complete);
+	authUrl.searchParams.set("client_id", QWEN_OAUTH_CLIENT_ID);
+	const fullAuthUrl = authUrl.toString();
+
+	_logger.info("Opening auth URL", { url: fullAuthUrl });
+
+	// 4. Show auth URL to user
 	callbacks.onAuth({
-		url: deviceAuth.verification_uri_complete,
+		url: fullAuthUrl,
 		instructions: `Open this URL and enter code: ${deviceAuth.user_code}`,
 	});
 
-	// 4. Open browser
-	openBrowser(deviceAuth.verification_uri_complete);
+	// 5. Open browser
+	openBrowser(fullAuthUrl);
 
 	callbacks.onProgress?.("Waiting for browser authorization...");
 
-	// 5. Poll for token
+	// 6. Poll for token
 	const deadline = Date.now() + deviceAuth.expires_in * 1000;
 	let pollInterval = INITIAL_POLL_INTERVAL_MS;
 
