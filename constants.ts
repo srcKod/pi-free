@@ -15,14 +15,17 @@ export const PROVIDER_NVIDIA = "nvidia";
 export const PROVIDER_CLINE = "cline";
 export const PROVIDER_FIREWORKS = "fireworks";
 export const PROVIDER_OLLAMA = "ollama";
+export const PROVIDER_MISTRAL = "mistral";
 
 export const ALL_PROVIDERS = [
 	PROVIDER_KILO,
 	PROVIDER_ZEN,
+	PROVIDER_GO,
 	PROVIDER_OPENROUTER,
 	PROVIDER_NVIDIA,
 	PROVIDER_CLINE,
 	PROVIDER_FIREWORKS,
+	PROVIDER_MISTRAL,
 	PROVIDER_OLLAMA,
 ] as const;
 
@@ -101,7 +104,6 @@ export const KILO_TOKEN_EXPIRATION_MS = 365 * 24 * 60 * 60 * 1000; // 1 year
 export const PROVIDER_GROQ = "groq";
 export const PROVIDER_TOGETHER = "together";
 export const PROVIDER_DEEPINFRA = "deepinfra";
-export const PROVIDER_MISTRAL = "mistral";
 export const PROVIDER_PERPLEXITY = "perplexity";
 export const PROVIDER_XAI = "xai";
 

@@ -14,7 +14,7 @@ import type {
 	ExtensionAPI,
 	ProviderModelConfig,
 } from "@mariozechner/pi-coding-agent";
-import { KILO_FREE_ONLY, PROVIDER_KILO } from "../config.ts";
+import { KILO_FREE_ONLY, KILO_SHOW_PAID, PROVIDER_KILO } from "../config.ts";
 import { URL_KILO_TOS } from "../constants.ts";
 import {
 	enhanceWithCI,
@@ -46,6 +46,7 @@ export default async function (pi: ExtensionAPI) {
 	}
 
 	let cachedAllModels: ProviderModelConfig[] = [];
+	let showPaidModels = KILO_SHOW_PAID;
 
 	// Shared model storage for setupProvider commands
 	const stored: StoredModels = { free: freeModels, all: [] };
@@ -66,7 +67,9 @@ export default async function (pi: ExtensionAPI) {
 		refreshToken: refreshKiloToken,
 		getApiKey: (cred: OAuthCredentials) => cred.access,
 		modifyModels: (models: Model<Api>[], _cred: OAuthCredentials) => {
-			if (KILO_FREE_ONLY || cachedAllModels.length === 0) return models;
+			if (!showPaidModels || KILO_FREE_ONLY || cachedAllModels.length === 0) {
+				return models;
+			}
 			const template = models.find((m) => m.provider === PROVIDER_KILO);
 			if (!template) return models;
 			const nonKilo = models.filter((m) => m.provider !== PROVIDER_KILO);
@@ -107,10 +110,9 @@ export default async function (pi: ExtensionAPI) {
 		{
 			providerId: PROVIDER_KILO,
 			tosUrl: URL_KILO_TOS,
-			initialShowPaid: true, // Kilo shows all available models (auth determines access)
+			initialShowPaid: KILO_SHOW_PAID,
 			reRegister: (models) => {
-				stored.free = models;
-				stored.all = models;
+				showPaidModels = models === stored.all;
 				reRegister(models);
 			},
 		},
@@ -134,7 +136,9 @@ export default async function (pi: ExtensionAPI) {
 						...KILO_PROVIDER_CONFIG,
 						oauth: oauthConfig as any,
 					});
-					ctxReRegister(freeModels);
+					const modelsToShow =
+						showPaidModels && !KILO_FREE_ONLY ? cachedAllModels : freeModels;
+					ctxReRegister(modelsToShow);
 				}
 			} catch (error) {
 				logWarning("kilo", "Failed to fetch models at session start", error);

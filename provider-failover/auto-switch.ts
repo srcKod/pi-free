@@ -18,7 +18,6 @@ import {
 	detectModelFamily,
 	normalizeModelName,
 	toModelInfo,
-	isModelFree,
 	type ModelInfo,
 } from "../lib/model-detection.ts";
 import { getHardcodedScore } from "./hardcoded-benchmarks.ts";
@@ -37,7 +36,7 @@ export interface AutoSwitchConfig {
 const DEFAULT_CONFIG: AutoSwitchConfig = {
 	enabled: true,
 	maxCIScoreDrop: 15,
-	providerPriority: ["zen", "kilo", "openrouter", "nvidia", "fireworks", "mistral", "ollama", "cline"],
+	providerPriority: ["zen", "go", "kilo", "openrouter", "nvidia", "fireworks", "mistral", "ollama", "cline"],
 };
 
 export interface AutoSwitchResult {
@@ -247,13 +246,14 @@ export async function findFallbackModel(
  * Returns the result of the switch attempt.
  */
 export async function autoFailover(
-	errorMessage: string,
+	_errorMessage: string,
 	failedModel: Model<any>,
 	pi: ExtensionAPI,
 	ctx: ExtensionContext,
 	config: Partial<AutoSwitchConfig> = {},
 ): Promise<AutoSwitchResult> {
-	if (!config.enabled) {
+	const fullConfig = { ...DEFAULT_CONFIG, ...config };
+	if (!fullConfig.enabled) {
 		return {
 			success: false,
 			switched: false,
@@ -273,7 +273,11 @@ export async function autoFailover(
 	}
 
 	// Find fallback model
-	const fallback = await findFallbackModel(failedModel, availableModels, config);
+	const fallback = await findFallbackModel(
+		failedModel,
+		availableModels,
+		fullConfig,
+	);
 
 	if (!fallback) {
 		return {

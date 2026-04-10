@@ -282,6 +282,31 @@ export NVIDIA_API_KEY="..."
 
 ---
 
+## Logging & Debugging
+
+pi-free now writes extension logs to:
+
+- **Windows:** `%USERPROFILE%\.pi\free.log`
+- **Linux/macOS:** `~/.pi/free.log`
+
+Useful env vars:
+
+```bash
+# Console log verbosity (default: error)
+LOG_LEVEL=debug
+
+# File log verbosity (default: debug)
+PI_FREE_LOG_LEVEL=debug
+
+# Custom log path (optional)
+PI_FREE_LOG_PATH=/tmp/pi-free.log
+
+# Disable file logging
+PI_FREE_FILE_LOG=false
+```
+
+---
+
 ## License
 
 MIT — See [LICENSE](LICENSE)

@@ -73,6 +73,43 @@ describe("Failover Handler", () => {
 			expect(result.action).toBe("retry");
 			expect(result.shouldRetry).toBe(true);
 		});
+
+		it("should default to auto-switch on rate limit when model is present", async () => {
+			const result = await handleProviderError(
+				"429 Rate limit exceeded",
+				{
+					provider: "test-provider",
+					isPaidMode: false,
+				},
+				{} as unknown as ExtensionAPI,
+				{
+					ui: { notify: () => {} },
+					model: { provider: "test-provider", id: "mimo-v2-pro-free" },
+				},
+			);
+
+			expect(result.action).toBe("switch");
+			expect(result.shouldRetry).toBe(false);
+		});
+
+		it("should not auto-switch when explicitly disabled", async () => {
+			const result = await handleProviderError(
+				"429 Rate limit exceeded",
+				{
+					provider: "test-provider",
+					isPaidMode: false,
+					autoSwitch: { enabled: false },
+				},
+				{} as unknown as ExtensionAPI,
+				{
+					ui: { notify: () => {} },
+					model: { provider: "test-provider", id: "mimo-v2-pro-free" },
+				},
+			);
+
+			expect(result.action).toBe("fail");
+			expect(result.shouldRetry).toBe(false);
+		});
 	});
 
 	describe("failure tracking", () => {

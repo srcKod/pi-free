@@ -23,6 +23,7 @@ import type {
 import {
 	applyHidden,
 	GO_SHOW_PAID,
+	OPENCODE_API_KEY,
 	OPENCODE_GO_API_KEY as CONFIG_API_KEY,
 	PROVIDER_GO,
 } from "../config.ts";
@@ -208,8 +209,8 @@ async function fetchGoModels(token: string): Promise<{
 // =============================================================================
 
 export default async function (pi: ExtensionAPI) {
-	const hasKey = !!CONFIG_API_KEY;
-	const token = CONFIG_API_KEY ?? "";
+	const token = CONFIG_API_KEY ?? OPENCODE_API_KEY ?? "";
+	const hasKey = !!token;
 
 	// Go requires an API key (no free tier)
 	if (!hasKey) {

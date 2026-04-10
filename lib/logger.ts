@@ -1,7 +1,15 @@
 /**
  * Structured logging utility.
  * Replaces console.log statements with namespaced, level-based logging.
+ *
+ * File logging:
+ * - Default file: ~/.pi/free.log
+ * - Override path: PI_FREE_LOG_PATH=/custom/path/free.log
+ * - Disable file logging: PI_FREE_FILE_LOG=false
  */
+
+import { appendFileSync, existsSync, mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -20,16 +28,44 @@ const LOG_LEVELS: Record<LogLevel, number> = {
 	error: 3,
 };
 
-// Default to error-only. Set LOG_LEVEL=debug or LOG_LEVEL=info to see more.
+// Console default: error-only. Set LOG_LEVEL=debug or LOG_LEVEL=info to see more.
 const currentLevel: LogLevel = (process.env.LOG_LEVEL as LogLevel) || "error";
+// File default: debug (so we can inspect full behavior in ~/.pi/free.log).
+const fileLevel: LogLevel =
+	(process.env.PI_FREE_LOG_LEVEL as LogLevel) || "debug";
 
-function shouldLog(level: LogLevel): boolean {
-	return LOG_LEVELS[level] >= LOG_LEVELS[currentLevel];
+function shouldLog(level: LogLevel, minLevel: LogLevel): boolean {
+	return LOG_LEVELS[level] >= LOG_LEVELS[minLevel];
 }
 
 function formatMessage(entry: LogEntry): string {
-	const data = entry.data ? ` ${JSON.stringify(entry.data)}` : "";
+	let data = "";
+	if (entry.data) {
+		try {
+			data = ` ${JSON.stringify(entry.data)}`;
+		} catch {
+			data = " [unserializable-data]";
+		}
+	}
 	return `[${entry.timestamp}] [${entry.level.toUpperCase()}] [${entry.namespace}] ${entry.message}${data}`;
+}
+
+const HOME_DIR = process.env.HOME || process.env.USERPROFILE || "";
+const DEFAULT_LOG_PATH = join(HOME_DIR, ".pi", "free.log");
+const LOG_PATH = process.env.PI_FREE_LOG_PATH || DEFAULT_LOG_PATH;
+const FILE_LOG_ENABLED = process.env.PI_FREE_FILE_LOG !== "false";
+
+function appendToFile(line: string): void {
+	if (!FILE_LOG_ENABLED) return;
+	try {
+		const dir = dirname(LOG_PATH);
+		if (!existsSync(dir)) {
+			mkdirSync(dir, { recursive: true });
+		}
+		appendFileSync(LOG_PATH, `${line}\n`, "utf8");
+	} catch {
+		// Never throw from logger
+	}
 }
 
 function log(
@@ -38,7 +74,9 @@ function log(
 	message: string,
 	data?: Record<string, unknown>,
 ): void {
-	if (!shouldLog(level)) return;
+	const logToConsole = shouldLog(level, currentLevel);
+	const logToFile = shouldLog(level, fileLevel);
+	if (!logToConsole && !logToFile) return;
 
 	const entry: LogEntry = {
 		timestamp: new Date().toISOString(),
@@ -49,6 +87,13 @@ function log(
 	};
 
 	const formatted = formatMessage(entry);
+	if (logToFile) {
+		appendToFile(formatted);
+	}
+
+	if (!logToConsole) {
+		return;
+	}
 
 	switch (level) {
 		case "debug":

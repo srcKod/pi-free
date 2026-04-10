@@ -6,10 +6,12 @@
  *   2. ~/.pi/free.json
  *
  * Per-provider paid model flags:
+ *   KILO_SHOW_PAID=true or kilo_show_paid: true
  *   OPENROUTER_SHOW_PAID=true or openrouter_show_paid: true
  *   NVIDIA_SHOW_PAID=true or nvidia_show_paid: true
  *   FIREWORKS_SHOW_PAID=true or fireworks_show_paid: true
  *   CLINE_SHOW_PAID=true or cline_show_paid: true
+ *   GO_SHOW_PAID=true or go_show_paid: true
  *   OLLAMA_SHOW_PAID=true or ollama_show_paid: true
  *
  * PI_FREE_KILO_FREE_ONLY=true — restrict Kilo to free models even after login.
@@ -32,6 +34,7 @@ interface PiFreeConfig {
 	kilo_free_only?: boolean;
 	hidden_models?: string[];
 	// Per-provider paid model flags
+	kilo_show_paid?: boolean;
 	openrouter_show_paid?: boolean;
 	nvidia_show_paid?: boolean;
 	fireworks_show_paid?: boolean;
@@ -52,6 +55,7 @@ const CONFIG_TEMPLATE: PiFreeConfig = {
 	ollama_api_key: "",
 	kilo_free_only: false,
 	hidden_models: [],
+	kilo_show_paid: false,
 	openrouter_show_paid: false,
 	nvidia_show_paid: false,
 	fireworks_show_paid: false,
@@ -127,6 +131,11 @@ function resolveBool(envKey: string, fileVal?: boolean): boolean {
 export const SHOW_PAID = process.env.PI_FREE_SHOW_PAID === "true";
 
 // Per-provider paid model flags - default to false (free-only) if not set
+export const KILO_SHOW_PAID = resolveBool(
+	"KILO_SHOW_PAID",
+	file.kilo_show_paid,
+);
+
 export const OPENROUTER_SHOW_PAID = resolveBool(
 	"OPENROUTER_SHOW_PAID",
 	file.openrouter_show_paid,

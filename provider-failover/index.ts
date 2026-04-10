@@ -109,8 +109,8 @@ function handleRateLimit(
 
 	const waitTime = Math.round((classified.retryAfterMs ?? 60000) / 1000);
 
-	// If auto-switch is enabled and we have model info, try to find a fallback
-	if (autoSwitchConfig?.enabled && _ctx.model?.id) {
+	// Auto-switch is enabled by default unless explicitly disabled
+	if (autoSwitchConfig?.enabled !== false && _ctx.model?.id) {
 		_logger.info("Attempting auto-switch for rate limit");
 		// Note: Actual switching happens in provider-helper.ts turn_end handler
 		// This just signals that a switch is possible
@@ -147,8 +147,8 @@ function handleCapacityError(
 ): FailoverResult {
 	_logger.info(`Capacity error on ${provider}`, { model: _ctx.model });
 
-	// If auto-switch is enabled and we have model info, try to find a fallback
-	if (autoSwitchConfig?.enabled && _ctx.model?.id) {
+	// Auto-switch is enabled by default unless explicitly disabled
+	if (autoSwitchConfig?.enabled !== false && _ctx.model?.id) {
 		_logger.info("Attempting auto-switch for capacity error");
 		return {
 			action: "switch",
