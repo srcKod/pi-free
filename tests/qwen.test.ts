@@ -40,9 +40,16 @@ vi.mock("../lib/util.ts", () => ({
 vi.mock("../providers/qwen-auth.ts", () => ({
 	loginQwen: vi.fn(),
 	refreshQwenToken: vi.fn(),
-	getQwenBaseUrl: vi.fn(
-		() => "https://dashscope.aliyuncs.com/compatible-mode/v1",
-	),
+	getQwenBaseUrl: vi.fn((cred: { resource_url?: string }) => {
+		const resourceUrl = cred?.resource_url || "";
+		if (resourceUrl) {
+			const normalized = resourceUrl.startsWith("http")
+				? resourceUrl
+				: `https://${resourceUrl}`;
+			return normalized.endsWith("/v1") ? normalized : `${normalized}/v1`;
+		}
+		return "https://dashscope.aliyuncs.com/compatible-mode/v1";
+	}),
 }));
 
 vi.mock("../providers/qwen-models.ts", () => ({
@@ -127,10 +134,6 @@ describe("Qwen OAuth Provider", () => {
 			await qwenProvider(mockPi);
 
 			expect(mockOn).toHaveBeenCalledWith("turn_end", expect.any(Function));
-			expect(mockOn).toHaveBeenCalledWith(
-				"before_provider_request",
-				expect.any(Function),
-			);
 		});
 	});
 
@@ -189,8 +192,9 @@ describe("Qwen OAuth Provider", () => {
 
 			const mockCreds = {
 				access: "qwen-access-token",
-				refresh: "resource.dashscope.aliyuncs.com::refresh-token",
+				refresh: "refresh-token",
 				expires: Date.now() + 3600000,
+				resource_url: "dashscope.aliyuncs.com",
 			};
 			vi.mocked(loginQwen).mockResolvedValue(mockCreds);
 
@@ -219,6 +223,7 @@ describe("Qwen OAuth Provider", () => {
 				access: "my-access-token",
 				refresh: "refresh",
 				expires: Date.now() + 3600000,
+				resource_url: "",
 			});
 
 			expect(apiKey).toBe("my-access-token");
@@ -289,6 +294,55 @@ describe("Qwen OAuth Provider", () => {
 					all: expect.any(Array),
 				}),
 			);
+		});
+	});
+
+	describe("modifyModels callback", () => {
+		it("should return models unchanged when resource_url is empty (default DashScope)", async () => {
+			vi.mocked(fetchQwenModels).mockResolvedValue([MOCK_MODEL]);
+
+			const { default: qwenProvider } = await import(
+				"../providers/qwen.ts"
+			);
+			await qwenProvider(mockPi);
+
+			const oauth = mockRegisterProvider.mock.calls[0][1].oauth;
+			const mockModels = [
+				{ id: "coder-model", name: "Qwen", provider: "qwen", api: "openai-completions", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 131072, maxTokens: 16384 },
+			];
+
+			const result = oauth.modifyModels(mockModels, {
+				access: "token",
+				refresh: "refresh",
+				expires: Date.now() + 3600000,
+				resource_url: "",
+			});
+
+			// Should return same models (no baseUrl change for default)
+			expect(result).toEqual(mockModels);
+		});
+
+		it("should update baseUrl when resource_url is present", async () => {
+			vi.mocked(fetchQwenModels).mockResolvedValue([MOCK_MODEL]);
+
+			const { default: qwenProvider } = await import(
+				"../providers/qwen.ts"
+			);
+			await qwenProvider(mockPi);
+
+			const oauth = mockRegisterProvider.mock.calls[0][1].oauth;
+			const mockModels = [
+				{ id: "coder-model", name: "Qwen", provider: "qwen", api: "openai-completions", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 131072, maxTokens: 16384 },
+			];
+
+			const result = oauth.modifyModels(mockModels, {
+				access: "token",
+				refresh: "refresh",
+				expires: Date.now() + 3600000,
+				resource_url: "custom.api.example.com",
+			});
+
+			expect(result[0].baseUrl).toBe("https://custom.api.example.com/v1");
 		});
 	});
 });
