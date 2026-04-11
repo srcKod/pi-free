@@ -298,18 +298,17 @@ export async function loginQwen(
 			const { data } = result;
 			callbacks.onProgress?.("Login successful!");
 
-			// Store resource_url in refresh token so we can recover it later
+			// Store resource_url as a proper field on OAuthCredentials
+			// (OAuthCredentials has [key: string]: unknown)
 			const resourceUrl = data.resource_url || "";
-			const combinedRefresh = resourceUrl
-				? `${resourceUrl}::${data.refresh_token ?? ""}`
-				: data.refresh_token ?? "";
 
 			return {
 				access: data.access_token!,
-				refresh: combinedRefresh,
+				refresh: data.refresh_token ?? "",
 				expires: data.expires_in
 					? Date.now() + data.expires_in * 1000
 					: Date.now() + 3600 * 1000, // 1 hour default
+				resource_url: resourceUrl,
 			};
 		}
 
@@ -341,12 +340,7 @@ export async function refreshQwenToken(
 		return credentials;
 	}
 
-	// Parse the combined refresh token
-	const refreshToken = credentials.refresh;
-	const parts = refreshToken.split("::");
-	const actualRefreshToken = parts.length > 1 ? parts[1] : parts[0];
-
-	if (!actualRefreshToken) {
+	if (!credentials.refresh) {
 		throw new Error(
 			"No refresh token available. Run /login qwen to re-authenticate.",
 		);
@@ -356,7 +350,7 @@ export async function refreshQwenToken(
 
 	const bodyData = {
 		grant_type: "refresh_token",
-		refresh_token: actualRefreshToken,
+		refresh_token: credentials.refresh,
 		client_id: QWEN_OAUTH_CLIENT_ID,
 	};
 
@@ -387,29 +381,27 @@ export async function refreshQwenToken(
 		throw new Error("Qwen token refresh returned no access token.");
 	}
 
-	// Preserve resource_url in refresh token
-	const resourceUrl = data.resource_url || "";
-	const combinedRefresh = resourceUrl
-		? `${resourceUrl}::${data.refresh_token ?? actualRefreshToken}`
-		: data.refresh_token ?? actualRefreshToken;
+	// Preserve resource_url as a proper field (not encoded in refresh token)
+	const resourceUrl = data.resource_url || (credentials.resource_url as string) || "";
 
 	return {
 		access: data.access_token,
-		refresh: combinedRefresh,
+		refresh: data.refresh_token ?? credentials.refresh,
 		expires: data.expires_in
 			? Date.now() + data.expires_in * 1000
 			: Date.now() + 3600 * 1000,
+		resource_url: resourceUrl,
 	};
 }
 
 /**
  * Extract the API base URL from credentials.
- * The resource_url is stored inside the refresh token.
+ * The resource_url is stored as a proper field on OAuthCredentials
+ * (the type has [key: string]: unknown for extensibility).
+ * Falls back to the default DashScope endpoint if not present.
  */
 export function getQwenBaseUrl(credentials: OAuthCredentials): string {
-	const refreshToken = credentials.refresh;
-	const parts = refreshToken.split("::");
-	const resourceUrl = parts.length > 1 ? parts[0] : "";
+	const resourceUrl = (credentials.resource_url as string) || "";
 
 	if (resourceUrl) {
 		const normalized = resourceUrl.startsWith("http")

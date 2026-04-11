@@ -9,7 +9,7 @@
  *   # Then /login qwen, select qwen model
  */
 
-import type { OAuthCredentials } from "@mariozechner/pi-ai";
+import type { OAuthCredentials, Model, Api } from "@mariozechner/pi-ai";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { PROVIDER_QWEN, URL_QWEN_TOS } from "../constants.ts";
 import {
@@ -56,10 +56,12 @@ export default async function (pi: ExtensionAPI) {
 		login: loginQwen,
 		refreshToken: refreshQwenToken,
 		getApiKey: (cred: OAuthCredentials) => cred.access,
-		modifyModels: (models: any[], cred: OAuthCredentials) => {
-			// Use the resource_url (enterpriseUrl) from OAuth credentials as the base URL
-			const baseUrl = getQwenBaseUrl(cred.enterpriseUrl as string | undefined);
+		modifyModels: (models: Model<Api>[], cred: OAuthCredentials) => {
+			// Use resource_url from OAuth credentials to set the correct API base URL
+			// The resource_url field is stored on OAuthCredentials via [key: string]: unknown
+			const baseUrl = getQwenBaseUrl(cred);
 			_logger.info("Qwen base URL from OAuth", { baseUrl });
+			if (baseUrl === DEFAULT_BASE_URL) return models;
 			return models.map((m) => ({
 				...m,
 				baseUrl,
@@ -103,31 +105,6 @@ export default async function (pi: ExtensionAPI) {
 		},
 		stored,
 	);
-
-	// Qwen-specific: update base URL dynamically from OAuth credentials
-	pi.on("before_provider_request", (event: unknown) => {
-		const evt = event as {
-			type?: string;
-			payload?: Record<string, unknown> & { baseUrl?: string };
-		};
-		if (evt.type !== "qwen") return;
-
-		// Try to get credentials and update base URL if resource_url was provided
-		try {
-			const cred = (pi as any).modelRegistry?.authStorage?.get?.(PROVIDER_QWEN);
-			if (cred?.type === "oauth" && evt.payload) {
-				const baseUrl = getQwenBaseUrl(cred.enterpriseUrl as string | undefined);
-				if (baseUrl !== DEFAULT_BASE_URL) {
-					_logger.debug("Using dynamic base URL from OAuth", { baseUrl });
-					evt.payload.baseUrl = baseUrl;
-				}
-			}
-		} catch {
-			// Ignore - use default base URL
-		}
-
-		return evt;
-	});
 
 	// Keep lightweight request counting for now (internal only).
 	pi.on("turn_end", async (_event, ctx) => {
