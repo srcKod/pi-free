@@ -58,9 +58,14 @@ export default async function (pi: ExtensionAPI) {
 		getApiKey: (cred: OAuthCredentials) => cred.access,
 		modifyModels: (models: Model<Api>[], cred: OAuthCredentials) => {
 			// Use resource_url from OAuth credentials to set the correct API base URL
-			// The resource_url field is stored on OAuthCredentials via [key: string]: unknown
 			const baseUrl = getQwenBaseUrl(cred);
-			_logger.info("Qwen base URL from OAuth", { baseUrl });
+			_logger.info("Qwen OAuth modifyModels called", { 
+				baseUrl, 
+				defaultBaseUrl: DEFAULT_BASE_URL,
+				modelCount: models.length,
+				hasAccessToken: !!cred.access,
+				hasResourceUrl: !!cred.resource_url 
+			});
 			if (baseUrl === DEFAULT_BASE_URL) return models;
 			return models.map((m) => ({
 				...m,
@@ -76,7 +81,10 @@ export default async function (pi: ExtensionAPI) {
 			apiKey: "QWEN_API_KEY",
 			api: "openai-completions" as const,
 			headers: {
-				"User-Agent": "pi-free-providers",
+				"User-Agent": "pi-free",
+				"X-DashScope-CacheControl": "enable",
+				"X-DashScope-UserAgent": "pi-free",
+				"X-DashScope-AuthType": "oauth2",
 			},
 			models: enhanceWithCI(m),
 			oauth: oauthConfig,

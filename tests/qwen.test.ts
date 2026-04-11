@@ -63,9 +63,24 @@ vi.mock("../providers/qwen-models.ts", () => ({
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 			contextWindow: 131_072,
 			maxTokens: 16_384,
+			compat: {
+				supportsStore: false,
+				supportsDeveloperRole: false,
+				supportsReasoningEffort: false,
+				supportsUsageInStreaming: false,
+				maxTokensField: "max_tokens",
+			},
 		},
 	],
 }));
+
+const DASHSCOPE_COMPAT = {
+	supportsStore: false,
+	supportsDeveloperRole: false,
+	supportsReasoningEffort: false,
+	supportsUsageInStreaming: false,
+	maxTokensField: "max_tokens" as const,
+};
 
 import { setupProvider } from "../provider-helper.ts";
 import { loginQwen } from "../providers/qwen-auth.ts";
@@ -76,10 +91,11 @@ const MOCK_MODEL = {
 	id: "coder-model",
 	name: "Qwen 3.6 Plus (Coder) — Free 1k/day",
 	reasoning: false,
-	input: ["text"],
+	input: ["text" as const],
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 	contextWindow: 131_072,
 	maxTokens: 16_384,
+	compat: DASHSCOPE_COMPAT,
 };
 
 describe("Qwen OAuth Provider", () => {
@@ -294,6 +310,59 @@ describe("Qwen OAuth Provider", () => {
 					all: expect.any(Array),
 				}),
 			);
+		});
+	});
+
+	describe("DashScope compat settings", () => {
+		it("should set compat to disable unsupported DashScope parameters", async () => {
+			vi.mocked(fetchQwenModels).mockResolvedValue([MOCK_MODEL]);
+
+			const { default: qwenProvider } = await import(
+				"../providers/qwen.ts"
+			);
+			await qwenProvider(mockPi);
+
+			const registerCall = mockRegisterProvider.mock.calls[0];
+			const models = registerCall?.[1]?.models;
+
+			expect(models[0].compat).toEqual({
+				supportsStore: false,
+				supportsDeveloperRole: false,
+				supportsReasoningEffort: false,
+				supportsUsageInStreaming: false,
+				maxTokensField: "max_tokens",
+			});
+		});
+
+		it("should preserve compat when modifyModels updates baseUrl", async () => {
+			vi.mocked(fetchQwenModels).mockResolvedValue([MOCK_MODEL]);
+
+			const { default: qwenProvider } = await import(
+				"../providers/qwen.ts"
+			);
+			await qwenProvider(mockPi);
+
+			const oauth = mockRegisterProvider.mock.calls[0][1].oauth;
+			const mockModels = [
+				{ id: "coder-model", name: "Qwen", provider: "qwen", api: "openai-completions", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 131072, maxTokens: 16384, compat: { supportsStore: false, supportsDeveloperRole: false, supportsReasoningEffort: false, supportsUsageInStreaming: false, maxTokensField: "max_tokens" as const } },
+			];
+
+			const result = oauth.modifyModels(mockModels, {
+				access: "token",
+				refresh: "refresh",
+				expires: Date.now() + 3600000,
+				resource_url: "custom.api.example.com",
+			});
+
+			// compat should be preserved when baseUrl is updated
+			expect(result[0].baseUrl).toBe("https://custom.api.example.com/v1");
+			expect(result[0].compat).toEqual({
+				supportsStore: false,
+				supportsDeveloperRole: false,
+				supportsReasoningEffort: false,
+				supportsUsageInStreaming: false,
+				maxTokensField: "max_tokens",
+			});
 		});
 	});
 

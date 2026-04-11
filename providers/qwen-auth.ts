@@ -264,12 +264,20 @@ export async function loginQwen(
 		verificationUri: deviceAuth.verification_uri,
 	});
 
-	// 3. Use verification_uri_complete directly (server already embedded the code)
-	// If not available, fall back to verification_uri + user_code
-	const authUrl = deviceAuth.verification_uri_complete || deviceAuth.verification_uri;
-	const instructions = deviceAuth.verification_uri_complete
-		? undefined // Code is already embedded in the URL
-		: `Enter code: ${deviceAuth.user_code}`;
+	// 3. Use verification_uri_complete directly (server embeds client=qwen-code)
+	// Fallback: construct URL with user_code and explicitly add client parameter
+	let authUrl: string;
+	if (deviceAuth.verification_uri_complete) {
+		authUrl = deviceAuth.verification_uri_complete;
+	} else {
+		// verification_uri doesn't have user_code or client, so we must add both
+		authUrl = `${deviceAuth.verification_uri}?user_code=${deviceAuth.user_code}&client=qwen-code`;
+	}
+	// Instructions: show user_code only when verification_uri_complete is missing
+	// (otherwise the URL already has everything embedded)
+	const instructions = !deviceAuth.verification_uri_complete
+		? `Enter code: ${deviceAuth.user_code}`
+		: undefined;
 
 	_logger.info("Opening auth URL", { url: authUrl });
 
