@@ -352,6 +352,8 @@ export async function loginQwen(
 export async function refreshQwenToken(
 	credentials: OAuthCredentials,
 ): Promise<OAuthCredentials> {
+	if (credentials.expires > Date.now()) return credentials;
+
 	if (!credentials.refresh) {
 		throw new Error(
 			"No refresh token available. Run /login qwen to re-authenticate.",
@@ -424,6 +426,6 @@ export function getQwenBaseUrl(credentials: OAuthCredentials): string {
 			: `${normalized}/v1`;
 	}
 
-	// Default DashScope endpoint
-	return "https://dashscope.aliyuncs.com/compatible-mode/v1";
+	// Default endpoint (portal.qwen.ai)
+	return "https://portal.qwen.ai/v1";
 }
