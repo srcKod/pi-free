@@ -10,36 +10,30 @@ import { createLogger } from "../lib/logger.ts";
 const _logger = createLogger("qwen-models");
 
 /**
- * DashScope compatibility settings for Qwen models.
+ * portal.qwen.ai compatibility settings.
  *
- * DashScope's OpenAI-compatible API does NOT support several parameters
- * that the pi framework sends by default. Without these overrides, the
- * API returns 400 "Unrecognized request argument" errors.
- *
- * - store: false              → not supported (omit entirely)
- * - max_completion_tokens      → use max_tokens instead
- * - stream_options.usage      → not supported
- * - developer role            → not supported (use system)
- * - reasoning_effort          → not supported
+ * portal.qwen.ai's OpenAI-compatible API does not support several parameters
+ * that the pi framework sends by default.
  */
-const DASHSCOPE_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
+const PORTAL_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
 	supportsStore: false,
 	supportsDeveloperRole: false,
 	supportsReasoningEffort: false,
 	supportsUsageInStreaming: false,
+	supportsStrictMode: false,
 	maxTokensField: "max_tokens",
 };
 
 export const QWEN_FREE_MODELS: ProviderModelConfig[] = [
 	{
 		id: "coder-model",
-		name: "Qwen 3.6 Plus (Coder) — Free 1k/day",
+		name: "Qwen Coder — Free 1k/day",
 		reasoning: false,
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		contextWindow: 131_072,
 		maxTokens: 16_384,
-		compat: DASHSCOPE_COMPAT,
+		compat: PORTAL_COMPAT,
 	},
 ];
 
