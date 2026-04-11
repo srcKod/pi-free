@@ -306,6 +306,15 @@ export async function loginQwen(
 			const { data } = result;
 			callbacks.onProgress?.("Login successful!");
 
+			// DEBUG: log full token response to diagnose endpoint issues
+			_logger.info("Token exchange response", {
+				resource_url: data.resource_url,
+				token_type: data.token_type,
+				expires_in: data.expires_in,
+				has_access: !!data.access_token,
+				has_refresh: !!data.refresh_token,
+			});
+
 			// Store resource_url as a proper field on OAuthCredentials
 			// (OAuthCredentials has [key: string]: unknown)
 			const resourceUrl = data.resource_url || "";
@@ -343,11 +352,6 @@ export async function loginQwen(
 export async function refreshQwenToken(
 	credentials: OAuthCredentials,
 ): Promise<OAuthCredentials> {
-	// If token hasn't expired, return as-is
-	if (credentials.expires > Date.now()) {
-		return credentials;
-	}
-
 	if (!credentials.refresh) {
 		throw new Error(
 			"No refresh token available. Run /login qwen to re-authenticate.",

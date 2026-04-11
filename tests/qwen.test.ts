@@ -9,7 +9,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock dependencies
 vi.mock("../constants.ts", () => ({
-	BASE_URL_QWEN: "https://dashscope.aliyuncs.com/compatible-mode/v1",
 	URL_QWEN_TOS: "https://terms.alicloud.com/",
 	PROVIDER_QWEN: "qwen",
 }));
@@ -48,16 +47,25 @@ vi.mock("../providers/qwen-auth.ts", () => ({
 				: `https://${resourceUrl}`;
 			return normalized.endsWith("/v1") ? normalized : `${normalized}/v1`;
 		}
-		return "https://dashscope.aliyuncs.com/compatible-mode/v1";
+		return "https://portal.qwen.ai/v1";
 	}),
 }));
+
+const PORTAL_COMPAT = {
+	supportsStore: false,
+	supportsDeveloperRole: false,
+	supportsReasoningEffort: false,
+	supportsUsageInStreaming: false,
+	supportsStrictMode: false,
+	maxTokensField: "max_tokens" as const,
+};
 
 vi.mock("../providers/qwen-models.ts", () => ({
 	fetchQwenModels: vi.fn(),
 	QWEN_FREE_MODELS: [
 		{
 			id: "coder-model",
-			name: "Qwen 3.6 Plus (Coder) — Free 1k/day",
+			name: "Qwen Coder — Free 1k/day",
 			reasoning: false,
 			input: ["text"],
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -68,19 +76,12 @@ vi.mock("../providers/qwen-models.ts", () => ({
 				supportsDeveloperRole: false,
 				supportsReasoningEffort: false,
 				supportsUsageInStreaming: false,
+				supportsStrictMode: false,
 				maxTokensField: "max_tokens",
 			},
 		},
 	],
 }));
-
-const DASHSCOPE_COMPAT = {
-	supportsStore: false,
-	supportsDeveloperRole: false,
-	supportsReasoningEffort: false,
-	supportsUsageInStreaming: false,
-	maxTokensField: "max_tokens" as const,
-};
 
 import { setupProvider } from "../provider-helper.ts";
 import { loginQwen } from "../providers/qwen-auth.ts";
@@ -89,13 +90,13 @@ import { incrementRequestCount } from "../usage/metrics.ts";
 
 const MOCK_MODEL = {
 	id: "coder-model",
-	name: "Qwen 3.6 Plus (Coder) — Free 1k/day",
+	name: "Qwen Coder — Free 1k/day",
 	reasoning: false,
 	input: ["text" as const],
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 	contextWindow: 131_072,
 	maxTokens: 16_384,
-	compat: DASHSCOPE_COMPAT,
+	compat: PORTAL_COMPAT,
 };
 
 describe("Qwen OAuth Provider", () => {
@@ -127,7 +128,7 @@ describe("Qwen OAuth Provider", () => {
 			expect(mockRegisterProvider).toHaveBeenCalledWith(
 				"qwen",
 				expect.objectContaining({
-					baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+					baseUrl: "https://portal.qwen.ai/v1",
 					apiKey: "QWEN_API_KEY",
 					api: "openai-completions",
 					models: [MOCK_MODEL],
@@ -162,7 +163,6 @@ describe("Qwen OAuth Provider", () => {
 			);
 			await qwenProvider(mockPi);
 
-			// setupProvider should receive stored models where free === all
 			expect(setupProvider).toHaveBeenCalledWith(
 				mockPi,
 				expect.objectContaining({ providerId: "qwen" }),
@@ -172,12 +172,10 @@ describe("Qwen OAuth Provider", () => {
 				}),
 			);
 
-			// Both free and all should have the same models
 			const storedArg = vi.mocked(setupProvider).mock.calls[0][2];
 			expect(storedArg.free).toEqual(storedArg.all);
 			expect(storedArg.free.length).toBeGreaterThan(0);
 
-			// All models should have zero cost
 			for (const model of storedArg.free) {
 				expect(model.cost.input).toBe(0);
 				expect(model.cost.output).toBe(0);
@@ -210,7 +208,7 @@ describe("Qwen OAuth Provider", () => {
 				access: "qwen-access-token",
 				refresh: "refresh-token",
 				expires: Date.now() + 3600000,
-				resource_url: "dashscope.aliyuncs.com",
+				resource_url: "portal.qwen.ai",
 			};
 			vi.mocked(loginQwen).mockResolvedValue(mockCreds);
 
@@ -255,7 +253,6 @@ describe("Qwen OAuth Provider", () => {
 			);
 			await qwenProvider(mockPi);
 
-			// Find turn_end handler
 			const turnEndCall = mockOn.mock.calls.find(
 				(call: unknown[]) => call[0] === "turn_end",
 			);
@@ -281,7 +278,6 @@ describe("Qwen OAuth Provider", () => {
 			);
 			const handler = turnEndCall![1];
 
-			// Different provider
 			const mockCtx = { model: { provider: "openrouter" } };
 			await handler({}, mockCtx);
 
@@ -313,8 +309,8 @@ describe("Qwen OAuth Provider", () => {
 		});
 	});
 
-	describe("DashScope compat settings", () => {
-		it("should set compat to disable unsupported DashScope parameters", async () => {
+	describe("portal.qwen.ai compat settings", () => {
+		it("should set compat to disable unsupported parameters", async () => {
 			vi.mocked(fetchQwenModels).mockResolvedValue([MOCK_MODEL]);
 
 			const { default: qwenProvider } = await import(
@@ -330,6 +326,7 @@ describe("Qwen OAuth Provider", () => {
 				supportsDeveloperRole: false,
 				supportsReasoningEffort: false,
 				supportsUsageInStreaming: false,
+				supportsStrictMode: false,
 				maxTokensField: "max_tokens",
 			});
 		});
@@ -344,7 +341,7 @@ describe("Qwen OAuth Provider", () => {
 
 			const oauth = mockRegisterProvider.mock.calls[0][1].oauth;
 			const mockModels = [
-				{ id: "coder-model", name: "Qwen", provider: "qwen", api: "openai-completions", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 131072, maxTokens: 16384, compat: { supportsStore: false, supportsDeveloperRole: false, supportsReasoningEffort: false, supportsUsageInStreaming: false, maxTokensField: "max_tokens" as const } },
+				{ id: "coder-model", name: "Qwen Coder", provider: "qwen", api: "openai-completions", baseUrl: "https://portal.qwen.ai/v1", reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 131_072, maxTokens: 16_384, compat: PORTAL_COMPAT },
 			];
 
 			const result = oauth.modifyModels(mockModels, {
@@ -354,20 +351,13 @@ describe("Qwen OAuth Provider", () => {
 				resource_url: "custom.api.example.com",
 			});
 
-			// compat should be preserved when baseUrl is updated
 			expect(result[0].baseUrl).toBe("https://custom.api.example.com/v1");
-			expect(result[0].compat).toEqual({
-				supportsStore: false,
-				supportsDeveloperRole: false,
-				supportsReasoningEffort: false,
-				supportsUsageInStreaming: false,
-				maxTokensField: "max_tokens",
-			});
+			expect(result[0].compat).toEqual(PORTAL_COMPAT);
 		});
 	});
 
 	describe("modifyModels callback", () => {
-		it("should return models unchanged when resource_url is empty (default DashScope)", async () => {
+		it("should return models unchanged when resource_url is empty (default portal)", async () => {
 			vi.mocked(fetchQwenModels).mockResolvedValue([MOCK_MODEL]);
 
 			const { default: qwenProvider } = await import(
@@ -377,7 +367,7 @@ describe("Qwen OAuth Provider", () => {
 
 			const oauth = mockRegisterProvider.mock.calls[0][1].oauth;
 			const mockModels = [
-				{ id: "coder-model", name: "Qwen", provider: "qwen", api: "openai-completions", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 131072, maxTokens: 16384 },
+				{ id: "coder-model", name: "Qwen Coder", provider: "qwen", api: "openai-completions", baseUrl: "https://portal.qwen.ai/v1", reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 131_072, maxTokens: 16_384 },
 			];
 
 			const result = oauth.modifyModels(mockModels, {
@@ -387,7 +377,6 @@ describe("Qwen OAuth Provider", () => {
 				resource_url: "",
 			});
 
-			// Should return same models (no baseUrl change for default)
 			expect(result).toEqual(mockModels);
 		});
 
@@ -401,7 +390,7 @@ describe("Qwen OAuth Provider", () => {
 
 			const oauth = mockRegisterProvider.mock.calls[0][1].oauth;
 			const mockModels = [
-				{ id: "coder-model", name: "Qwen", provider: "qwen", api: "openai-completions", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 131072, maxTokens: 16384 },
+				{ id: "coder-model", name: "Qwen Coder", provider: "qwen", api: "openai-completions", baseUrl: "https://portal.qwen.ai/v1", reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 131_072, maxTokens: 16_384 },
 			];
 
 			const result = oauth.modifyModels(mockModels, {
