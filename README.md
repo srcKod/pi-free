@@ -6,11 +6,11 @@ Free AI model providers for [Pi](https://pi.dev). Access **free models** from mu
 
 ## What does pi-free do
 
-**pi-free is a Pi extension that unlocks free AI models from 8 different providers.**
+**pi-free is a Pi extension that unlocks free AI models from 10 different providers.**
 
 When you install pi-free, it:
 
-1. **Registers 7 AI providers** with Pi's model picker — OpenCode Zen, Kilo, OpenRouter, NVIDIA NIM, Cline, Mistral, and Ollama Cloud
+1. **Registers 9 AI providers** with Pi's model picker — OpenCode Zen, Kilo, OpenRouter, NVIDIA NIM, Cline, Mistral, Ollama Cloud, Qwen, and Modal
 
 2. **Filters to show only free models by default** — You see only the models that cost $0 to use, no API key required for some providers
 
@@ -44,6 +44,8 @@ Free models are shown by default — look for the provider prefixes:
 - `cline/` — Cline models (run `/login cline` to use)
 - `mistral/` — Mistral models (API key required)
 - `ollama/` — Ollama Cloud models (API key required)
+- `qwen/` — Qwen Coder (run `/login qwen` to use, 1,000 free requests/day)
+- `modal/` — GLM-5.1 FP8 via Modal (API key required, free promotional period until April 30, 2026)
 
 ### 3. Toggle between free and paid models
 
@@ -78,7 +80,7 @@ Add your API keys to this file:
   "ollama_api_key": "...",
   "fireworks_api_key": "...",
   "mistral_api_key": "...",
-  "modal_api_key": "..."
+  "modal_api_key": "sk-modal-..."
 }
 ```
 
@@ -93,8 +95,10 @@ See the [Providers That Need Authentication](#providers-that-need-authentication
 | `/{provider}-toggle` | Switch between free-only and all models for that provider |
 | `/login kilo` | Start OAuth flow for Kilo |
 | `/login cline` | Start OAuth flow for Cline |
+| `/login qwen` | Start OAuth flow for Qwen |
 | `/logout kilo` | Clear Kilo OAuth credentials |
 | `/logout cline` | Clear Cline OAuth credentials |
+| `/logout qwen` | Clear Qwen OAuth credentials |
 
 ---
 
@@ -226,6 +230,29 @@ This command will:
 - Free account required (no credit card)
 - Uses local ports 48801-48811 for OAuth callback
 
+### Modal (GLM-5.1 FP8 — free until April 30, 2026)
+
+Modal hosts GLM-5.1 FP8 with a free promotional period. Get an API key at [modal.com](https://modal.com), then:
+
+**Option A: Environment variable**
+```bash
+export MODAL_API_KEY="sk-modal-..."
+```
+
+**Option B: Config file** (`~/.pi/free.json`)
+```json
+{
+  "modal_api_key": "sk-modal-..."
+}
+```
+
+Then select a `modal/` model in the model picker.
+
+**Details:**
+- Free promotional period until April 30, 2026
+- Model: GLM-5.1 FP8 (128k context, 16k max output)
+- No credit card required during the promotional period
+
 ### Mistral
 
 Add API key to `~/.pi/free.json` or environment variables:
@@ -233,6 +260,28 @@ Add API key to `~/.pi/free.json` or environment variables:
 ```bash
 export MISTRAL_API_KEY="..."
 ```
+
+### Qwen (1,000 free requests/day)
+
+Qwen provides free access to **Qwen Coder** (Qwen3.6-Plus) via OAuth device flow — no API key or credit card needed.
+
+```
+/login qwen
+```
+
+This command will:
+1. Open your browser to Qwen Studio's authorization page
+2. Display a device code (enter it if the browser doesn't pre-fill it)
+3. Wait for you to authorize in the browser
+4. Automatically complete login once approved
+
+Then select a `qwen/` model in the model picker.
+
+**Details:**
+- Free tier: 1,000 requests/day
+- Model: Qwen Coder (131k context, 16k max output)
+- No credit card required — just a free [Qwen Studio](https://chat.qwen.ai) account
+- To re-authenticate: `/logout qwen` then `/login qwen`
 
 ---
 
@@ -249,6 +298,8 @@ Each provider has toggle commands to switch between free and all models:
 | `/cline-toggle` | Toggle between free/all Cline models |
 | `/mistral-toggle` | Toggle between free/all Mistral models |
 | `/ollama-toggle` | Toggle between free/all Ollama models |
+| `/login qwen` | Authenticate with Qwen Studio (OAuth) |
+| `/logout qwen` | Clear Qwen credentials |
 
 **The toggle command:**
 - Switches between showing only free models vs. all available models
@@ -270,6 +321,7 @@ Create `~/.pi/free.json` in your home directory:
   "opencode_api_key": "YOUR_ZEN_KEY",
   "ollama_api_key": "YOUR_OLLAMA_KEY",
   "ollama_show_paid": true,
+  "modal_api_key": "YOUR_MODAL_KEY",
   "hidden_models": ["model-id-to-hide"]
 }
 ```
