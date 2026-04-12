@@ -78,6 +78,5 @@
 			"./providers/qwen.ts",
 			"./providers/modal.ts"
 		]
-	},
-}
+	}
 }
