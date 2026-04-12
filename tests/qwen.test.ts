@@ -53,7 +53,6 @@ const PORTAL_COMPAT = {
 
 vi.mock("../providers/qwen-models.ts", () => ({
 	fetchQwenModels: vi.fn(),
-	fetchQwenLiveModels: vi.fn(async (_baseUrl: string, _token: string, models: unknown[]) => models),
 	PORTAL_COMPAT: {
 		supportsStore: false,
 		supportsDeveloperRole: false,
@@ -331,7 +330,7 @@ describe("Qwen OAuth Provider", () => {
 			});
 		});
 
-		it("should preserve compat after modifyModels resolves", async () => {
+		it("should preserve compat after modifyModels", async () => {
 			vi.mocked(fetchQwenModels).mockResolvedValue([MOCK_MODEL]);
 
 			const { default: qwenProvider } = await import(
@@ -344,21 +343,19 @@ describe("Qwen OAuth Provider", () => {
 				{ id: "coder-model", name: "Qwen Coder", provider: "qwen", api: "openai-completions", baseUrl: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 131_072, maxTokens: 16_384, compat: PORTAL_COMPAT },
 			];
 
-			const result = await oauth.modifyModels(mockModels, {
+			const result = oauth.modifyModels(mockModels, {
 				access: "token",
 				refresh: "refresh",
 				expires: Date.now() + 3600000,
 				resource_url: "custom.api.example.com",
 			});
 
-			// Always routes to DashScope regardless of resource_url
-			expect(result[0].baseUrl).toBe("https://dashscope-intl.aliyuncs.com/compatible-mode/v1");
 			expect(result[0].compat).toEqual(PORTAL_COMPAT);
 		});
 	});
 
 	describe("modifyModels callback", () => {
-		it("should always route to DashScope regardless of resource_url", async () => {
+		it("should return models unchanged (DashScope routing is in getQwenBaseUrl)", async () => {
 			vi.mocked(fetchQwenModels).mockResolvedValue([MOCK_MODEL]);
 
 			const { default: qwenProvider } = await import(
@@ -371,22 +368,14 @@ describe("Qwen OAuth Provider", () => {
 				{ id: "coder-model", name: "Qwen Coder", provider: "qwen", api: "openai-completions", baseUrl: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 131_072, maxTokens: 16_384 },
 			];
 
-			// resource_url is ignored — always DashScope
-			const resultEmpty = await oauth.modifyModels(mockModels, {
+			const result = oauth.modifyModels(mockModels, {
 				access: "token",
 				refresh: "refresh",
 				expires: Date.now() + 3600000,
 				resource_url: "",
 			});
-			expect(resultEmpty[0].baseUrl).toBe("https://dashscope-intl.aliyuncs.com/compatible-mode/v1");
 
-			const resultCustom = await oauth.modifyModels(mockModels, {
-				access: "token",
-				refresh: "refresh",
-				expires: Date.now() + 3600000,
-				resource_url: "portal.qwen.ai",
-			});
-			expect(resultCustom[0].baseUrl).toBe("https://dashscope-intl.aliyuncs.com/compatible-mode/v1");
+			expect(result).toEqual(mockModels);
 		});
 	});
 });
