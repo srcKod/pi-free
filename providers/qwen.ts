@@ -38,6 +38,7 @@ const DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1";
 const DASHSCOPE_HEADERS = {
 	"X-DashScope-AuthType": "qwen-oauth",
 	"X-DashScope-CacheControl": "enable",
+	"X-DashScope-UserAgent": "QwenCode/0.0.5 (pi-free)",
 	"Client-Code": "QwenCode",
 };
 
