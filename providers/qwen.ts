@@ -22,7 +22,7 @@ import { incrementRequestCount } from "../usage/metrics.ts";
 import { logWarning } from "../lib/util.ts";
 import { createLogger } from "../lib/logger.ts";
 import { loginQwen, refreshQwenToken, getQwenBaseUrl } from "./qwen-auth.ts";
-import { fetchQwenModels } from "./qwen-models.ts";
+import { fetchQwenModels, fetchQwenLiveModels } from "./qwen-models.ts";
 
 const _logger = createLogger("qwen");
 
@@ -30,7 +30,7 @@ const _logger = createLogger("qwen");
 // Constants
 // =============================================================================
 
-const DEFAULT_BASE_URL = "https://portal.qwen.ai/v1";
+const DEFAULT_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
 
 // =============================================================================
 // Extension entry point
@@ -56,21 +56,21 @@ export default async function (pi: ExtensionAPI) {
 		login: loginQwen,
 		refreshToken: refreshQwenToken,
 		getApiKey: (cred: OAuthCredentials) => cred.access,
-		modifyModels: (models: Model<Api>[], cred: OAuthCredentials) => {
-			// Use resource_url from OAuth credentials to set the correct API base URL
+		modifyModels: async (models: Model<Api>[], cred: OAuthCredentials) => {
 			const baseUrl = getQwenBaseUrl(cred);
-			_logger.info("Qwen OAuth modifyModels called", { 
-				baseUrl, 
+			_logger.info("Qwen OAuth modifyModels called", {
+				baseUrl,
 				defaultBaseUrl: DEFAULT_BASE_URL,
 				modelCount: models.length,
 				hasAccessToken: !!cred.access,
-				hasResourceUrl: !!cred.resource_url 
+				hasResourceUrl: !!cred.resource_url,
 			});
-			if (baseUrl === DEFAULT_BASE_URL) return models;
-			return models.map((m) => ({
-				...m,
-				baseUrl,
-			}));
+
+			// Resolve the real model ID from the live API
+			const resolved = await fetchQwenLiveModels(baseUrl, cred.access, models as any);
+
+			if (baseUrl === DEFAULT_BASE_URL) return resolved;
+			return (resolved as Model<Api>[]).map((m) => ({ ...m, baseUrl }));
 		},
 	};
 
@@ -82,6 +82,7 @@ export default async function (pi: ExtensionAPI) {
 			api: "openai-completions" as const,
 			headers: {
 				"User-Agent": "pi-free",
+				"X-DashScope-AuthType": "qwen-oauth",
 			},
 			models: enhanceWithCI(m),
 			oauth: oauthConfig,

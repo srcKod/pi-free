@@ -410,22 +410,14 @@ export async function refreshQwenToken(
 
 /**
  * Extract the API base URL from credentials.
- * The resource_url is stored as a proper field on OAuthCredentials
- * (the type has [key: string]: unknown for extensibility).
- * Falls back to the default DashScope endpoint if not present.
+ *
+ * resource_url returned by Qwen OAuth is "portal.qwen.ai" (the web UI).
+ * That endpoint returns 400 on chat completions — DashScope is the correct
+ * API endpoint for OAuth tokens. We always use DashScope and ignore resource_url.
+ *
+ * qwen-code uses the same approach: DEFAULT_DASHSCOPE_BASE_URL regardless of
+ * what resource_url the token carries.
  */
-export function getQwenBaseUrl(credentials: OAuthCredentials): string {
-	const resourceUrl = (credentials.resource_url as string) || "";
-
-	if (resourceUrl) {
-		const normalized = resourceUrl.startsWith("http")
-			? resourceUrl
-			: `https://${resourceUrl}`;
-		return normalized.endsWith("/v1")
-			? normalized
-			: `${normalized}/v1`;
-	}
-
-	// Default endpoint (portal.qwen.ai)
-	return "https://portal.qwen.ai/v1";
+export function getQwenBaseUrl(_credentials?: OAuthCredentials): string {
+	return "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
 }
