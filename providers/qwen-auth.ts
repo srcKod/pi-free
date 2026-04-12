@@ -413,13 +413,22 @@ export async function refreshQwenToken(
 /**
  * Extract the API base URL from credentials.
  *
- * resource_url returned by Qwen OAuth is "portal.qwen.ai" (the web UI).
- * That endpoint returns 400 on chat completions — DashScope is the correct
- * API endpoint for OAuth tokens. We always use DashScope and ignore resource_url.
+ * The OAuth flow authenticates via chat.qwen.ai (Qwen Studio). The resulting
+ * token is valid for portal.qwen.ai, which is the correct API endpoint.
+ * DashScope is a separate Alibaba Cloud service that requires its own API key.
  *
- * qwen-code uses the same approach: DEFAULT_DASHSCOPE_BASE_URL regardless of
- * what resource_url the token carries.
+ * If resource_url is present in credentials, use it (allows custom endpoints).
+ * Otherwise default to portal.qwen.ai.
  */
-export function getQwenBaseUrl(_credentials?: OAuthCredentials): string {
-	return "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
+export function getQwenBaseUrl(credentials?: OAuthCredentials): string {
+	const resourceUrl = (credentials?.resource_url as string) || "";
+
+	if (resourceUrl) {
+		const normalized = resourceUrl.startsWith("http")
+			? resourceUrl
+			: `https://${resourceUrl}`;
+		return normalized.endsWith("/v1") ? normalized : `${normalized}/v1`;
+	}
+
+	return "https://portal.qwen.ai/v1";
 }
