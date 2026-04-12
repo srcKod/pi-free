@@ -30,7 +30,7 @@ const _logger = createLogger("qwen");
 // Constants
 // =============================================================================
 
-const DEFAULT_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
+const DEFAULT_BASE_URL = "https://portal.qwen.ai/v1";
 
 // =============================================================================
 // Extension entry point
@@ -75,7 +75,6 @@ export default async function (pi: ExtensionAPI) {
 			api: "openai-completions" as const,
 			headers: {
 				"User-Agent": "pi-free",
-				"X-DashScope-AuthType": "qwen-oauth",
 			},
 			models: enhanceWithCI(m),
 			oauth: oauthConfig,
