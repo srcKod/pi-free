@@ -77,11 +77,13 @@ function objectToUrlEncoded(data: Record<string, string>): string {
 function openBrowser(url: string): void {
 	try {
 		if (process.platform === "win32") {
-			spawn("cmd", ["/c", "start", "", url], {
-				detached: true,
-				shell: false,
-				windowsHide: true,
-			}).unref();
+			// cmd.exe interprets & as a command separator, breaking URLs with query params.
+			// PowerShell's Start-Process treats the URL as a literal string.
+			spawn(
+				"powershell.exe",
+				["-NoProfile", "-NonInteractive", "-Command", `Start-Process "${url.replace(/"/g, '\\"')}"`],
+				{ detached: true, shell: false, windowsHide: true },
+			).unref();
 		} else if (process.platform === "darwin") {
 			spawn("open", [url], { detached: true }).unref();
 		} else {
