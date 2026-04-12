@@ -1,6 +1,6 @@
 {
 	"name": "pi-free",
-	"version": "1.0.7",
+	"version": "1.0.8",
 	"type": "module",
 	"description": "AIO Free AI models for Pi - Access free models from Kilo, Zen, OpenRouter, NVIDIA, Cline, Mistral, Ollama, and Qwen",
 	"keywords": [

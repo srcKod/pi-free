@@ -6,11 +6,11 @@ Free AI model providers for [Pi](https://pi.dev). Access **free models** from mu
 
 ## What does pi-free do
 
-**pi-free is a Pi extension that unlocks free AI models from 8 different providers.**
+**pi-free is a Pi extension that unlocks free AI models from 9 different providers.**
 
 When you install pi-free, it:
 
-1. **Registers 7 AI providers** with Pi's model picker — OpenCode Zen, Kilo, OpenRouter, NVIDIA NIM, Cline, Mistral, and Ollama Cloud
+1. **Registers 8 AI providers** with Pi's model picker — OpenCode Zen, Kilo, OpenRouter, NVIDIA NIM, Cline, Mistral, Ollama Cloud, and Qwen
 
 2. **Filters to show only free models by default** — You see only the models that cost $0 to use, no API key required for some providers
 
@@ -44,6 +44,7 @@ Free models are shown by default — look for the provider prefixes:
 - `cline/` — Cline models (run `/login cline` to use)
 - `mistral/` — Mistral models (API key required)
 - `ollama/` — Ollama Cloud models (API key required)
+- `qwen/` — Qwen Coder (run `/login qwen` to use, 1,000 free requests/day)
 
 ### 3. Toggle between free and paid models
 
@@ -93,8 +94,10 @@ See the [Providers That Need Authentication](#providers-that-need-authentication
 | `/{provider}-toggle` | Switch between free-only and all models for that provider |
 | `/login kilo` | Start OAuth flow for Kilo |
 | `/login cline` | Start OAuth flow for Cline |
+| `/login qwen` | Start OAuth flow for Qwen |
 | `/logout kilo` | Clear Kilo OAuth credentials |
 | `/logout cline` | Clear Cline OAuth credentials |
+| `/logout qwen` | Clear Qwen OAuth credentials |
 
 ---
 
@@ -234,6 +237,28 @@ Add API key to `~/.pi/free.json` or environment variables:
 export MISTRAL_API_KEY="..."
 ```
 
+### Qwen (1,000 free requests/day)
+
+Qwen provides free access to **Qwen Coder** (Qwen3.6-Plus) via OAuth device flow — no API key or credit card needed.
+
+```
+/login qwen
+```
+
+This command will:
+1. Open your browser to Qwen Studio's authorization page
+2. Display a device code (enter it if the browser doesn't pre-fill it)
+3. Wait for you to authorize in the browser
+4. Automatically complete login once approved
+
+Then select a `qwen/` model in the model picker.
+
+**Details:**
+- Free tier: 1,000 requests/day
+- Model: Qwen Coder (131k context, 16k max output)
+- No credit card required — just a free [Qwen Studio](https://chat.qwen.ai) account
+- To re-authenticate: `/logout qwen` then `/login qwen`
+
 ---
 
 ## Slash Commands
@@ -249,6 +274,8 @@ Each provider has toggle commands to switch between free and all models:
 | `/cline-toggle` | Toggle between free/all Cline models |
 | `/mistral-toggle` | Toggle between free/all Mistral models |
 | `/ollama-toggle` | Toggle between free/all Ollama models |
+| `/login qwen` | Authenticate with Qwen Studio (OAuth) |
+| `/logout qwen` | Clear Qwen credentials |
 
 **The toggle command:**
 - Switches between showing only free models vs. all available models
