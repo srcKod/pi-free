@@ -79,7 +79,5 @@
 			"./providers/modal.ts"
 		]
 	},
-	"dependencies": {
-		"pi-free": "github:apmantza/pi-free"
-	}
+}
 }
