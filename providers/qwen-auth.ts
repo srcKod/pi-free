@@ -410,25 +410,23 @@ export async function refreshQwenToken(
 	};
 }
 
+// Fallback endpoint used when resource_url is absent from the OAuth token.
+// Mirrors qwen-code's DEFAULT_QWEN_BASE_URL.
+const QWEN_DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+
 /**
- * Extract the API base URL from credentials.
+ * Resolve the API base URL from OAuth credentials.
  *
- * The OAuth flow authenticates via chat.qwen.ai (Qwen Studio). The resulting
- * token is valid for portal.qwen.ai, which is the correct API endpoint.
- * DashScope is a separate Alibaba Cloud service that requires its own API key.
- *
- * If resource_url is present in credentials, use it (allows custom endpoints).
- * Otherwise default to portal.qwen.ai.
+ * Replicates qwen-code's getCurrentEndpoint() logic exactly:
+ *   - Chinese accounts receive resource_url "dashscope.aliyuncs.com"
+ *     → normalised to "https://dashscope.aliyuncs.com/v1"
+ *   - International accounts receive resource_url "portal.qwen.ai"
+ *     → normalised to "https://portal.qwen.ai/v1"
+ *   - No resource_url → fallback "https://dashscope.aliyuncs.com/compatible-mode/v1"
  */
 export function getQwenBaseUrl(credentials?: OAuthCredentials): string {
 	const resourceUrl = (credentials?.resource_url as string) || "";
-
-	if (resourceUrl) {
-		const normalized = resourceUrl.startsWith("http")
-			? resourceUrl
-			: `https://${resourceUrl}`;
-		return normalized.endsWith("/v1") ? normalized : `${normalized}/v1`;
-	}
-
-	return "https://portal.qwen.ai/v1";
+	const base = resourceUrl || QWEN_DEFAULT_BASE_URL;
+	const normalized = base.startsWith("http") ? base : `https://${base}`;
+	return normalized.endsWith("/v1") ? normalized : `${normalized}/v1`;
 }

@@ -30,7 +30,16 @@ const _logger = createLogger("qwen");
 // Constants
 // =============================================================================
 
-const DEFAULT_BASE_URL = "https://portal.qwen.ai/v1";
+// Mirrors qwen-code's DEFAULT_QWEN_BASE_URL (used when resource_url is absent).
+const DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+
+// Headers required by DashScope's OpenAI-compatible API for OAuth tokens.
+// Replicates DashScopeOpenAICompatibleProvider.buildHeaders() from qwen-code.
+const DASHSCOPE_HEADERS = {
+	"X-DashScope-AuthType": "qwen-oauth",
+	"X-DashScope-CacheControl": "enable",
+	"Client-Code": "QwenCode",
+};
 
 // =============================================================================
 // Extension entry point
@@ -57,13 +66,17 @@ export default async function (pi: ExtensionAPI) {
 		refreshToken: refreshQwenToken,
 		getApiKey: (cred: OAuthCredentials) => cred.access,
 		modifyModels: (models: Model<Api>[], cred: OAuthCredentials) => {
+			// Mirror qwen-code: resolve baseUrl from resource_url per-credential.
+			// Chinese accounts → dashscope.aliyuncs.com/v1
+			// International accounts → portal.qwen.ai/v1 (or custom endpoint)
 			const baseUrl = getQwenBaseUrl(cred);
 			_logger.info("Qwen OAuth modifyModels called", {
 				baseUrl,
+				resource_url: cred.resource_url,
 				modelCount: models.length,
-				hasAccessToken: !!cred.access,
 			});
-			return models;
+			if (baseUrl === DEFAULT_BASE_URL) return models;
+			return (models as Model<Api>[]).map((m) => ({ ...m, baseUrl }));
 		},
 	};
 
@@ -75,6 +88,7 @@ export default async function (pi: ExtensionAPI) {
 			api: "openai-completions" as const,
 			headers: {
 				"User-Agent": "pi-free",
+				...DASHSCOPE_HEADERS,
 			},
 			models: enhanceWithCI(m),
 			oauth: oauthConfig,

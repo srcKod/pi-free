@@ -39,7 +39,8 @@ vi.mock("../lib/util.ts", () => ({
 vi.mock("../providers/qwen-auth.ts", () => ({
 	loginQwen: vi.fn(),
 	refreshQwenToken: vi.fn(),
-	getQwenBaseUrl: vi.fn(() => "https://portal.qwen.ai/v1"),
+	// Default: no resource_url → fallback DashScope (mirrors qwen-code behaviour)
+	getQwenBaseUrl: vi.fn(() => "https://dashscope.aliyuncs.com/compatible-mode/v1"),
 }));
 
 const PORTAL_COMPAT = {
@@ -127,7 +128,7 @@ describe("Qwen OAuth Provider", () => {
 			expect(mockRegisterProvider).toHaveBeenCalledWith(
 				"qwen",
 				expect.objectContaining({
-					baseUrl: "https://portal.qwen.ai/v1",
+					baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
 					apiKey: "QWEN_API_KEY",
 					api: "openai-completions",
 					models: [MOCK_MODEL],
@@ -340,7 +341,7 @@ describe("Qwen OAuth Provider", () => {
 
 			const oauth = mockRegisterProvider.mock.calls[0][1].oauth;
 			const mockModels = [
-				{ id: "coder-model", name: "Qwen Coder", provider: "qwen", api: "openai-completions", baseUrl: "https://portal.qwen.ai/v1", reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 131_072, maxTokens: 16_384, compat: PORTAL_COMPAT },
+				{ id: "coder-model", name: "Qwen Coder", provider: "qwen", api: "openai-completions", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 131_072, maxTokens: 16_384, compat: PORTAL_COMPAT },
 			];
 
 			const result = oauth.modifyModels(mockModels, {
@@ -365,7 +366,7 @@ describe("Qwen OAuth Provider", () => {
 
 			const oauth = mockRegisterProvider.mock.calls[0][1].oauth;
 			const mockModels = [
-				{ id: "coder-model", name: "Qwen Coder", provider: "qwen", api: "openai-completions", baseUrl: "https://portal.qwen.ai/v1", reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 131_072, maxTokens: 16_384 },
+				{ id: "coder-model", name: "Qwen Coder", provider: "qwen", api: "openai-completions", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 131_072, maxTokens: 16_384 },
 			];
 
 			const result = oauth.modifyModels(mockModels, {
