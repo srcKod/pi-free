@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.8] - 2026-04-13
 
 ### Added
+- **Modal provider** — Free access to GLM-5.1 FP8 (128k context, 16k max output) during promotional period (free until April 30, 2026)
+  - Requires a free Modal API key (`MODAL_API_KEY` or `modal_api_key` in `~/.pi/free.json`)
+  - Model: `zai-org/GLM-5.1-FP8` — 128k context window, 16k max output tokens
 - **Qwen provider** — Free access to Qwen Coder (1,000 requests/day) via OAuth device flow
   - Run `/login qwen` to authenticate through Qwen Studio (chat.qwen.ai)
   - Uses `coder-model` alias (maps to Qwen3.6-Plus on the backend)

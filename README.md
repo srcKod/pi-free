@@ -6,11 +6,11 @@ Free AI model providers for [Pi](https://pi.dev). Access **free models** from mu
 
 ## What does pi-free do
 
-**pi-free is a Pi extension that unlocks free AI models from 9 different providers.**
+**pi-free is a Pi extension that unlocks free AI models from 10 different providers.**
 
 When you install pi-free, it:
 
-1. **Registers 8 AI providers** with Pi's model picker — OpenCode Zen, Kilo, OpenRouter, NVIDIA NIM, Cline, Mistral, Ollama Cloud, and Qwen
+1. **Registers 9 AI providers** with Pi's model picker — OpenCode Zen, Kilo, OpenRouter, NVIDIA NIM, Cline, Mistral, Ollama Cloud, Qwen, and Modal
 
 2. **Filters to show only free models by default** — You see only the models that cost $0 to use, no API key required for some providers
 
@@ -45,6 +45,7 @@ Free models are shown by default — look for the provider prefixes:
 - `mistral/` — Mistral models (API key required)
 - `ollama/` — Ollama Cloud models (API key required)
 - `qwen/` — Qwen Coder (run `/login qwen` to use, 1,000 free requests/day)
+- `modal/` — GLM-5.1 FP8 via Modal (API key required, free promotional period until April 30, 2026)
 
 ### 3. Toggle between free and paid models
 
@@ -79,7 +80,7 @@ Add your API keys to this file:
   "ollama_api_key": "...",
   "fireworks_api_key": "...",
   "mistral_api_key": "...",
-  "modal_api_key": "..."
+  "modal_api_key": "sk-modal-..."
 }
 ```
 
@@ -229,6 +230,29 @@ This command will:
 - Free account required (no credit card)
 - Uses local ports 48801-48811 for OAuth callback
 
+### Modal (GLM-5.1 FP8 — free until April 30, 2026)
+
+Modal hosts GLM-5.1 FP8 with a free promotional period. Get an API key at [modal.com](https://modal.com), then:
+
+**Option A: Environment variable**
+```bash
+export MODAL_API_KEY="sk-modal-..."
+```
+
+**Option B: Config file** (`~/.pi/free.json`)
+```json
+{
+  "modal_api_key": "sk-modal-..."
+}
+```
+
+Then select a `modal/` model in the model picker.
+
+**Details:**
+- Free promotional period until April 30, 2026
+- Model: GLM-5.1 FP8 (128k context, 16k max output)
+- No credit card required during the promotional period
+
 ### Mistral
 
 Add API key to `~/.pi/free.json` or environment variables:
@@ -297,6 +321,7 @@ Create `~/.pi/free.json` in your home directory:
   "opencode_api_key": "YOUR_ZEN_KEY",
   "ollama_api_key": "YOUR_OLLAMA_KEY",
   "ollama_show_paid": true,
+  "modal_api_key": "YOUR_MODAL_KEY",
   "hidden_models": ["model-id-to-hide"]
 }
 ```
