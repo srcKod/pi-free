@@ -77,7 +77,12 @@ export default async function (pi: ExtensionAPI) {
 				modelCount: models.length,
 			});
 			if (baseUrl === DEFAULT_BASE_URL) return models;
-			return (models as Model<Api>[]).map((m) => ({ ...m, baseUrl }));
+			// modifyModels receives ALL models across providers — only patch Qwen ones.
+			const nonQwen = models.filter((m) => m.provider !== PROVIDER_QWEN);
+			const qwen = models
+				.filter((m) => m.provider === PROVIDER_QWEN)
+				.map((m) => ({ ...m, baseUrl }));
+			return [...nonQwen, ...qwen];
 		},
 	};
 
