@@ -13,7 +13,7 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import { saveConfig } from "./config.ts";
 import { createLogger } from "./lib/logger.ts";
-import { enhanceModelNameWithCodingIndex } from "./provider-failover/hardcoded-benchmarks.ts";
+import { enhanceModelNameWithCodingIndex } from "./provider-failover/benchmark-lookup.js";
 import type { AutoSwitchConfig } from "./provider-failover/auto-switch.ts";
 
 const _logger = createLogger("provider-helper");

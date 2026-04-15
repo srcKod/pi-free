@@ -9971,81 +9971,13 @@ export const HARDCODED_BENCHMARKS: Record<string, HardcodedBenchmark> = {
 	},
 };
 
-/**
- * Find benchmark data by model name
- */
-export function findHardcodedBenchmark(
-	modelName: string,
-	modelId: string,
-): HardcodedBenchmark | null {
-	const search = `${modelName} ${modelId}`.toLowerCase();
+// =============================================================================
+// Re-export lookup functions from benchmark-lookup.ts
+// Consumers that imported from this file will still work.
+// =============================================================================
 
-	// Direct lookup
-	for (const [key, data] of Object.entries(HARDCODED_BENCHMARKS)) {
-		if (search.includes(key.toLowerCase())) {
-			return data;
-		}
-	}
-
-	// Variant matching
-	const variants: Record<string, string[]> = {
-		"gpt-4o": ["gpt-4o", "gpt-4-o"],
-		"gpt-4": ["gpt-4", "gpt4"],
-		"claude-3.5-sonnet": [
-			"claude-3.5-sonnet",
-			"claude-3-5-sonnet",
-			"sonnet-3.5",
-		],
-		"claude-3-opus": ["claude-3-opus", "opus-3"],
-		"llama-3.1-405b": ["llama-3.1-405b", "llama3.1-405b", "llama-405b"],
-		"llama-3.1-70b": ["llama-3.1-70b", "llama3.1-70b", "llama-70b"],
-		"gemini-1.5-pro": ["gemini-1.5-pro", "gemini1.5-pro", "gemini-pro-1.5"],
-		"qwen2.5-72b": ["qwen2.5-72b", "qwen-2.5-72b"],
-		"deepseek-v3": ["deepseek-v3", "deepseekv3", "deepseek-chat"],
-		"mimo-v2-pro": ["mimo-v2-pro", "mimo-v2-pro-free", "mimo-pro"],
-		"mimo-v2-omni": ["mimo-v2-omni", "mimo-v2-omni-free", "mimo-omni"],
-		"mimo-v2-flash": ["mimo-v2-flash", "mimo-v2-flash-free", "mimo-flash"],
-		"big-pickle": ["big-pickle", "bigpickle"],
-		"minimax-m2.5": ["minimax-m2.5", "minimax-m2.5-free", "minimax-m25"],
-		"nvidia-nemotron-3-super-120b-a12b-reasoning": [
-			"nemotron-3-super",
-			"nemotron-3-super-free",
-			"nemotron-super",
-			"nemotron-3",
-		],
-	};
-
-	for (const [canonical, names] of Object.entries(variants)) {
-		if (names.some((n) => search.includes(n.toLowerCase()))) {
-			return HARDCODED_BENCHMARKS[canonical] || null;
-		}
-	}
-
-	return null;
-}
-
-/**
- * Get score from hardcoded data
- */
-export function getHardcodedScore(
-	modelName: string,
-	modelId: string,
-): number | null {
-	const benchmark = findHardcodedBenchmark(modelName, modelId);
-	return benchmark?.normalizedScore ?? null;
-}
-
-/**
- * Enhance model name with Coding Index score
- * Returns model name with CI score appended if available
- */
-export function enhanceModelNameWithCodingIndex(
-	modelName: string,
-	modelId: string,
-): string {
-	const benchmark = findHardcodedBenchmark(modelName, modelId);
-	if (benchmark?.codingIndex !== undefined) {
-		return `${modelName} [CI: ${benchmark.codingIndex.toFixed(1)}]`;
-	}
-	return modelName;
-}
+export {
+	findHardcodedBenchmark,
+	getHardcodedScore,
+	enhanceModelNameWithCodingIndex,
+} from "./benchmark-lookup.js";
