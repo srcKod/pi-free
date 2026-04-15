@@ -20,7 +20,7 @@ import {
 	toModelInfo,
 	type ModelInfo,
 } from "../lib/model-detection.ts";
-import { getHardcodedScore } from "./hardcoded-benchmarks.ts";
+import { getHardcodedScore } from "./benchmark-lookup.js";
 
 const _logger = createLogger("auto-switch");
 
