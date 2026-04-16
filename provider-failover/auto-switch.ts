@@ -62,11 +62,11 @@ interface CandidateModel {
  * 2. Same model family, prefer free models
  * 3. Any free model with similar CI score
  */
-export async function findFallbackModel(
+export function findFallbackModel(
 	failedModel: Model<any>,
 	availableModels: Model<any>[],
 	config: Partial<AutoSwitchConfig> = {},
-): Promise<CandidateModel | null> {
+): CandidateModel | null {
 	const fullConfig = { ...DEFAULT_CONFIG, ...config };
 
 	// Convert to ModelInfo for internal processing
@@ -273,7 +273,7 @@ export async function autoFailover(
 	}
 
 	// Find fallback model
-	const fallback = await findFallbackModel(
+	const fallback = findFallbackModel(
 		failedModel,
 		availableModels,
 		fullConfig,

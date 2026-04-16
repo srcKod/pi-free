@@ -13,12 +13,12 @@
  */
 
 import crypto from "node:crypto";
-import { spawn } from "node:child_process";
 import type {
 	OAuthCredentials,
 	OAuthLoginCallbacks,
 } from "@mariozechner/pi-ai";
 import { createLogger } from "../lib/logger.ts";
+import { openBrowser } from "../lib/open-browser.ts";
 
 const _logger = createLogger("qwen-auth");
 
@@ -72,26 +72,6 @@ function objectToUrlEncoded(data: Record<string, string>): string {
 				`${encodeURIComponent(key)}=${encodeURIComponent(data[key])}`,
 		)
 		.join("&");
-}
-
-function openBrowser(url: string): void {
-	try {
-		if (process.platform === "win32") {
-			// cmd.exe interprets & as a command separator, breaking URLs with query params.
-			// PowerShell's Start-Process treats the URL as a literal string.
-			spawn(
-				"powershell.exe",
-				["-NoProfile", "-NonInteractive", "-Command", `Start-Process "${url.replace(/"/g, '\\"')}"`],
-				{ detached: true, shell: false, windowsHide: true },
-			).unref();
-		} else if (process.platform === "darwin") {
-			spawn("open", [url], { detached: true }).unref();
-		} else {
-			spawn("xdg-open", [url], { detached: true }).unref();
-		}
-	} catch (err) {
-		_logger.debug("Failed to open browser", { error: String(err) });
-	}
 }
 
 function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {

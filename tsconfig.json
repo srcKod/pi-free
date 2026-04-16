@@ -13,13 +13,7 @@
 		"declarationMap": true,
 		"sourceMap": true,
 		"allowImportingTsExtensions": true,
-		"noEmit": true,
-		"baseUrl": ".",
-		"paths": {
-			"@mariozechner/pi-coding-agent": [
-				"node_modules/@mariozechner/pi-coding-agent"
-			]
-		}
+		"noEmit": true
 	},
 	"include": ["**/*.ts", "providers/**/*.ts"],
 	"exclude": ["node_modules", ".pi-lens"]

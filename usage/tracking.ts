@@ -3,7 +3,7 @@
  */
 
 import { createLogger } from "../lib/logger.ts";
-import { persistUsage } from "./cumulative.ts";
+import { persistUsage, type UsageEntry } from "./cumulative.ts";
 import { incrementRequestCount } from "./metrics.ts";
 
 const logger = createLogger("usage:tracking");
@@ -44,15 +44,8 @@ export function resetUsageStats(): void {
 	sessionStats.providers.clear();
 }
 
-export function incrementModelRequestCount(
-	provider: string,
-	modelId: string,
-	tokensIn = 0,
-	tokensOut = 0,
-	cacheRead = 0,
-	cacheWrite = 0,
-	cost = 0,
-): void {
+export function incrementModelRequestCount(entry: Partial<UsageEntry> & { provider: string; modelId: string }): void {
+	const { provider, modelId, tokensIn = 0, tokensOut = 0, cacheRead = 0, cacheWrite = 0, cost = 0 } = entry;
 	const key = `${provider}/${modelId}`;
 	const existing = modelUsageCounts.get(key);
 
@@ -112,15 +105,7 @@ export function incrementModelRequestCount(
 	}
 
 	// Persist to disk
-	persistUsage(
-		provider,
-		modelId,
-		tokensIn,
-		tokensOut,
-		cacheRead,
-		cacheWrite,
-		cost,
-	);
+	persistUsage({ provider, modelId, tokensIn, tokensOut, cacheRead, cacheWrite, cost });
 }
 
 export function getModelUsage(

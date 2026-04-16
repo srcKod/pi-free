@@ -11,26 +11,6 @@ import { createLogger } from "../lib/logger.ts";
 import { getDailyRequestCount } from "./metrics.ts";
 import type { FreeTierLimit, FreeTierUsage } from "./types.ts";
 
-export {
-	type CumulativeUsageReport,
-	getCumulativeUsage,
-} from "./cumulative.ts";
-export {
-	formatCumulativeUsage,
-	formatFreeTierStatus,
-	formatSessionUsage,
-} from "./formatters.ts";
-// Re-export from specialized modules
-export {
-	getModelUsage,
-	getProviderModelUsage,
-	getSessionUsage,
-	getTopModels,
-	incrementModelRequestCount,
-	logModelUsageReport,
-	resetUsageStats,
-	type SessionUsageReport,
-} from "./tracking.ts";
 // Re-export types for consumers
 export type { FreeTierLimit, FreeTierUsage } from "./types.ts";
 

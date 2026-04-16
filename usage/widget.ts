@@ -12,8 +12,15 @@ import { collectRows, recordSessionRequest } from "../widget/data.ts";
 import { renderWidgetHTML } from "../widget/render.ts";
 import { recordTurn } from "./store.ts";
 
-const GLIMPSE_PATH =
-	"file:///C:/Users/R3LiC/AppData/Roaming/npm/node_modules/glimpseui/src/glimpse.mjs";
+const GLIMPSE_PATH = (() => {
+	// Resolve glimpseui module path dynamically across OS and install locations.
+	// Avoids hardcoding absolute paths that break on other machines.
+	const npmRoot =
+		process.platform === "win32"
+			? `${process.env.APPDATA ?? "~/AppData/Roaming"}/npm/node_modules`
+			: "/usr/local/lib/node_modules";
+	return `file://${npmRoot}/glimpseui/src/glimpse.mjs`;
+})();
 
 let glimpseWin: unknown = null;
 
