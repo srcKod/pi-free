@@ -51,12 +51,12 @@ async function getAllSessionFiles(signal?: AbortSignal): Promise<string[]> {
 						files.push(join(cwdPath, file));
 					}
 				}
-			} catch {
-				// Skip directories we can't read
+			} catch (err) {
+				_logger.debug("Skipping unreadable directory", { path: cwdPath, error: err });
 			}
 		}
-	} catch {
-		// Return empty if we can't read sessions dir
+	} catch (err) {
+		_logger.debug("Cannot read sessions directory", { sessionsDir, error: err });
 	}
 
 	return files;
@@ -124,13 +124,14 @@ async function parseSessionFile(
 						});
 					}
 				}
-			} catch {
-				// Skip malformed lines
+			} catch (err) {
+				_logger.debug("Skipping malformed session line", { filePath, line: i, error: err });
 			}
 		}
 
 		return sessionId ? { sessionId, messages } : null;
-	} catch {
+	} catch (err) {
+		_logger.warn("Failed to parse session file", { filePath, error: err });
 		return null;
 	}
 }

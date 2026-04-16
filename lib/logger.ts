@@ -63,8 +63,8 @@ function appendToFile(line: string): void {
 			mkdirSync(dir, { recursive: true });
 		}
 		appendFileSync(LOG_PATH, `${line}\n`, "utf8");
-	} catch {
-		// Never throw from logger
+	} catch (err) {
+		console.error("Failed to write to log file:", err);
 	}
 }
 

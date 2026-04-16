@@ -9971,13 +9971,4 @@ export const HARDCODED_BENCHMARKS: Record<string, HardcodedBenchmark> = {
 	},
 };
 
-// =============================================================================
-// Re-export lookup functions from benchmark-lookup.ts
-// Consumers that imported from this file will still work.
-// =============================================================================
 
-export {
-	findHardcodedBenchmark,
-	getHardcodedScore,
-	enhanceModelNameWithCodingIndex,
-} from "./benchmark-lookup.js";
