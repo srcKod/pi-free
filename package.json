@@ -2,7 +2,7 @@
 	"name": "pi-free",
 	"version": "1.0.9",
 	"type": "module",
-	"description": "AIO Free AI models for Pi - Access free models from Kilo, Zen, OpenRouter, NVIDIA, Cline, Mistral, Ollama, and Qwen",
+	"description": "Free AI models for Pi - Access free models from Zen, Kilo, OpenRouter, NVIDIA, Cline, Mistral, Ollama, Qwen, and Modal (plus Go and Fireworks as paid providers)",
 	"keywords": [
 		"pi-package",
 		"pi-extension",
@@ -16,7 +16,10 @@
 		"mistral",
 		"fireworks",
 		"qwen",
-		"qwen-oauth"
+		"qwen-oauth",
+		"modal",
+		"opencode-go",
+		"zen"
 	],
 	"license": "MIT",
 	"author": "Apostolos Mantzaris",

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Go provider** — OpenCode Go subscription gateway (⚠️ paid only — $5 first month, then $10/month, no free tier) with models: GLM-5, Kimi K2.5, MiMo-V2-Pro, MiMo-V2-Omni, MiniMax M2.7, MiniMax M2.5
+  - Set `OPENCODE_GO_API_KEY` or `opencode_go_api_key` in `~/.pi/free.json`
+  - Toggle with `/go-toggle`
+
+### Changed
+- Updated README with clear free vs paid provider distinction (9 free + 2 paid-only: Go, Fireworks)
+- Added Go and Fireworks provider documentation under new "💳 Paid-Only Providers" section
+- Added `opencode_go_api_key` to config file template
+- Updated package.json description and keywords to include all 11 providers
+
 ## [1.0.9] - 2026-04-14
 
 ### Fixed

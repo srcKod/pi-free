@@ -6,17 +6,17 @@ Free AI model providers for [Pi](https://pi.dev). Access **free models** from mu
 
 ## What does pi-free do
 
-**pi-free is a Pi extension that unlocks free AI models from 10 different providers.**
+**pi-free is a Pi extension that unlocks free AI models from 9 providers — and adds 2 paid providers for convenience.**
 
 When you install pi-free, it:
 
-1. **Registers 9 AI providers** with Pi's model picker — OpenCode Zen, Kilo, OpenRouter, NVIDIA NIM, Cline, Mistral, Ollama Cloud, Qwen, and Modal
+1. **Registers 11 AI providers** with Pi's model picker — 9 with free tiers + 2 paid-only (OpenCode Go, Fireworks)
 
-2. **Filters to show only free models by default** — You see only the models that cost $0 to use, no API key required for some providers
+2. **Filters to show only free models by default** — You see only the models that cost $0 to use, no API key required for some providers. Paid-only providers are hidden until you explicitly enable them.
 
 3. **Provides a toggle command** — Run `/{provider}-toggle` (e.g., `/zen-toggle`, `/kilo-toggle`) to switch between free-only mode and showing all models including paid ones
 
-4. **Handles authentication for you** — OAuth flows (Kilo, Cline) open your browser automatically; API keys are read from `~/.pi/free.json` or environment variables
+4. **Handles authentication for you** — OAuth flows (Kilo, Cline, Qwen) open your browser automatically; API keys are read from `~/.pi/free.json` or environment variables
 
 5. **Adds Coding Index scores** — Model names include a coding benchmark score (CI: 45.2) to help you pick capable coding models at a glance
 
@@ -37,15 +37,21 @@ pi install git:github.com/apmantza/pi-free
 Start Pi and press `Ctrl+L` to open the model picker.
 
 Free models are shown by default — look for the provider prefixes:
+
+**🆓 Free tiers (no cost):**
 - `zen/` — OpenCode Zen models (no setup required)
 - `kilo/` — Kilo models (free models available immediately, more after `/login kilo`)
 - `openrouter/` — OpenRouter models (free account required)
 - `nvidia/` — NVIDIA NIM models (free API key required)
 - `cline/` — Cline models (run `/login cline` to use)
-- `mistral/` — Mistral models (API key required)
-- `ollama/` — Ollama Cloud models (API key required)
 - `qwen/` — Qwen Coder (run `/login qwen` to use, 1,000 free requests/day)
-- `modal/` — GLM-5.1 FP8 via Modal (API key required, free promotional period until April 30, 2026)
+- `modal/` — GLM-5.1 FP8 via Modal (free promotional period until April 30, 2026)
+- `ollama/` — Ollama Cloud models (free API key required)
+- `mistral/` — Mistral models (free API key required)
+
+**💳 Paid only (no free tier):**
+- `go/` — OpenCode Go models (requires subscription — $5 first month, then $10/month)
+- `fireworks/` — Fireworks models (credit-based pricing, no free tier)
 
 ### 3. Toggle between free and paid models
 
@@ -59,13 +65,15 @@ Want to see paid models too? Run the toggle command for your provider:
 /cline-toggle    # Toggle Cline free/paid models
 /mistral-toggle  # Toggle Mistral free/paid models
 /ollama-toggle   # Toggle Ollama models (requires SHOW_PAID=true)
+/go-toggle       # Toggle Go models (⚠️ paid only — requires subscription)
+/fireworks-toggle # Toggle Fireworks models (⚠️ paid only — no free tier)
 ```
 
 You'll see a notification like: `zen: showing free models` or `zen: showing all models (including paid)`
 
 ### 4. Add API keys for more providers (optional)
 
-Some providers require a free account or API key.
+Some providers require a free account or API key. **Two providers (Go, Fireworks) are paid-only with no free tier.**
 
 **The first time you run Pi after installing this extension, a config file is automatically created:**
 - **Linux/Mac:** `~/.pi/free.json`
@@ -141,7 +149,11 @@ Free tier resets every 5 hours + 7 days.
 
 ## Providers That Need Authentication
 
-Some providers require free accounts or OAuth to access their free tiers:
+Some providers require free accounts or OAuth to access their free tiers. **Two providers (Go, Fireworks) are paid-only — they have no free tier.**
+
+---
+
+### 🆓 Free Providers
 
 ### Kilo (free models, more after login)
 
@@ -214,7 +226,7 @@ Or in `~/.pi/free.json`:
 
 Toggle anytime with `/nvidia-toggle`
 
-### Cline
+### Cline (free account)
 
 Cline models appear immediately in the model picker. To use them, authenticate with Cline's free account:
 
@@ -230,7 +242,7 @@ This command will:
 - Free account required (no credit card)
 - Uses local ports 48801-48811 for OAuth callback
 
-### Modal (GLM-5.1 FP8 — free until April 30, 2026)
+### Modal (GLM-5.1 FP8 — free promotional period until April 30, 2026)
 
 Modal hosts GLM-5.1 FP8 with a free promotional period. Get an API key at [modal.com](https://modal.com), then:
 
@@ -253,7 +265,7 @@ Then select a `modal/` model in the model picker.
 - Model: GLM-5.1 FP8 (128k context, 16k max output)
 - No credit card required during the promotional period
 
-### Mistral
+### Mistral (free API key)
 
 Add API key to `~/.pi/free.json` or environment variables:
 
@@ -285,6 +297,52 @@ Then select a `qwen/` model in the model picker.
 
 ---
 
+### 💳 Paid-Only Providers
+
+> **⚠️ These providers have no free tier. All usage incurs costs.**
+
+### OpenCode Go (subscription — $5 first month, then $10/month)
+
+Go provides access to curated open coding models via a monthly subscription. There is no free tier.
+
+Set `OPENCODE_GO_API_KEY` (or `opencode_go_api_key` in `~/.pi/free.json`) and `GO_SHOW_PAID=true` to enable.
+
+**Models available:**
+- GLM-5
+- Kimi K2.5
+- MiMo-V2-Pro
+- MiMo-V2-Omni
+- MiniMax M2.7
+- MiniMax M2.5
+
+**Pricing:** $5 first month, then $10/month. See [opencode.ai/docs/go](https://opencode.ai/docs/go).
+
+Toggle with `/go-toggle`.
+
+### Fireworks (credit-based — no free tier)
+
+Fireworks provides fast inference for open-source models. **All models are credit-based with no free tier.** You must set `FIREWORKS_SHOW_PAID=true` to even see these models.
+
+Get an API key at [fireworks.ai](https://fireworks.ai), then:
+
+**Option A: Environment variable**
+```bash
+export FIREWORKS_API_KEY="..."
+export FIREWORKS_SHOW_PAID=true
+```
+
+**Option B: Config file** (`~/.pi/free.json`)
+```json
+{
+  "fireworks_api_key": "YOUR_KEY",
+  "fireworks_show_paid": true
+}
+```
+
+Toggle with `/fireworks-toggle`.
+
+---
+
 ## Slash Commands
 
 Each provider has toggle commands to switch between free and all models:
@@ -298,6 +356,8 @@ Each provider has toggle commands to switch between free and all models:
 | `/cline-toggle` | Toggle between free/all Cline models |
 | `/mistral-toggle` | Toggle between free/all Mistral models |
 | `/ollama-toggle` | Toggle between free/all Ollama models |
+| `/go-toggle` | ⚠️ Toggle Go models (paid only) |
+| `/fireworks-toggle` | ⚠️ Toggle Fireworks models (paid only) |
 | `/login qwen` | Authenticate with Qwen Studio (OAuth) |
 | `/logout qwen` | Clear Qwen credentials |
 
@@ -319,6 +379,7 @@ Create `~/.pi/free.json` in your home directory:
   "fireworks_api_key": "YOUR_FIREWORKS_KEY",
   "mistral_api_key": "YOUR_MISTRAL_KEY",
   "opencode_api_key": "YOUR_ZEN_KEY",
+  "opencode_go_api_key": "YOUR_GO_KEY",
   "ollama_api_key": "YOUR_OLLAMA_KEY",
   "ollama_show_paid": true,
   "modal_api_key": "YOUR_MODAL_KEY",
