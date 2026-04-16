@@ -5,6 +5,9 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { createLogger } from "./logger.ts";
+
+const _logger = createLogger("json-persistence");
 
 export interface JSONStore<T> {
 	load(): T;
@@ -28,8 +31,7 @@ export function createJSONStore<T extends object>(
 				return cached;
 			}
 		} catch (err) {
-			// Silently fail and return default
-			void err;
+			_logger.warn("Failed to load JSON store, using default", { filepath, error: err });
 		}
 		cached = defaultValue;
 		return cached;
@@ -44,8 +46,7 @@ export function createJSONStore<T extends object>(
 			}
 			writeFileSync(filepath, `${JSON.stringify(data, null, 2)}\n`, "utf-8");
 		} catch (err) {
-			// Silently fail - persistence is best-effort
-			void err;
+			_logger.warn("Failed to save JSON store", { filepath, error: err });
 		}
 	}
 
@@ -71,8 +72,8 @@ export function createJSONLStore<T extends object>(
 					.filter((line) => line.trim())
 					.map((line) => JSON.parse(line) as T);
 			}
-		} catch {
-			// Return empty on error
+		} catch (err) {
+			_logger.warn("Failed to load JSONL store, using empty array", { filepath, error: err });
 		}
 		return [];
 	}
@@ -85,16 +86,16 @@ export function createJSONLStore<T extends object>(
 			}
 			const line = JSON.stringify(entry);
 			writeFileSync(filepath, `${line}\n`, { flag: "a", encoding: "utf-8" });
-		} catch {
-			// Silently fail
+		} catch (err) {
+			_logger.warn("Failed to append to JSONL store", { filepath, error: err });
 		}
 	}
 
 	function clear(): void {
 		try {
 			writeFileSync(filepath, "", "utf-8");
-		} catch {
-			// Silently fail
+		} catch (err) {
+			_logger.warn("Failed to clear JSONL store", { filepath, error: err });
 		}
 	}
 
