@@ -2,7 +2,6 @@
  * Kilo device authorization flow and token management.
  */
 
-import { spawn } from "node:child_process";
 import type {
 	OAuthCredentials,
 	OAuthLoginCallbacks,
@@ -12,25 +11,9 @@ import {
 	KILO_TOKEN_EXPIRATION_MS,
 } from "../constants.ts";
 import { createLogger } from "../lib/logger.ts";
+import { openBrowser } from "../lib/open-browser.ts";
 
 const _logger = createLogger("kilo-auth");
-
-function openBrowser(url: string): void {
-	try {
-		if (process.platform === "win32") {
-			spawn("cmd", ["/c", "start", "", url], {
-				detached: true,
-				shell: false,
-			}).unref();
-		} else if (process.platform === "darwin") {
-			spawn("open", [url], { detached: true }).unref();
-		} else {
-			spawn("xdg-open", [url], { detached: true }).unref();
-		}
-	} catch (err) {
-		_logger.debug("Failed to open browser", { error: String(err) });
-	}
-}
 
 const KILO_API_BASE = process.env.KILO_API_URL || "https://api.kilo.ai";
 const DEVICE_AUTH_ENDPOINT = `${KILO_API_BASE}/api/device-auth/codes`;

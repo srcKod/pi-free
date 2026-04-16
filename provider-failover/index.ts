@@ -36,6 +36,25 @@ export interface FailoverResult {
 	switchToModel?: string;
 }
 
+/** Context passed to error handlers */
+interface ErrorHandlerContext {
+	ui: {
+		notify: (message: string, type: "info" | "warning" | "error") => void;
+	};
+	model?: { provider?: string; id?: string };
+	session?: { id?: string };
+}
+
+/** Options for internal error handlers */
+interface ErrorHandlerOptions {
+	classified: ClassifiedError;
+	provider: string;
+	isPaidMode?: boolean;
+	ctx: ErrorHandlerContext;
+	pi: ExtensionAPI;
+	autoSwitch?: Partial<AutoSwitchConfig>;
+}
+
 // Track consecutive failures per provider
 const failureCounts = new Map<string, number>();
 const MAX_CONSECUTIVE_FAILURES = 3;
@@ -47,13 +66,7 @@ export async function handleProviderError(
 	error: unknown,
 	config: FailoverConfig,
 	pi: ExtensionAPI,
-	ctx: {
-		ui: {
-			notify: (message: string, type: "info" | "warning" | "error") => void;
-		};
-		model?: { provider?: string; id?: string };
-		session?: { id?: string };
-	},
+	ctx: ErrorHandlerContext,
 ): Promise<FailoverResult> {
 	const { provider, isPaidMode, autoSwitch } = config;
 
@@ -73,10 +86,10 @@ export async function handleProviderError(
 
 	switch (classified.type) {
 		case "rate_limit":
-			return handleRateLimit(classified, provider, isPaidMode, ctx, pi, autoSwitch);
+			return handleRateLimit({ classified, provider, isPaidMode, ctx, pi, autoSwitch });
 
 		case "capacity":
-			return handleCapacityError(classified, provider, ctx, pi, autoSwitch);
+			return handleCapacityError({ classified, provider, ctx, pi, autoSwitch });
 
 		case "auth":
 			return handleAuthError(classified, provider);
@@ -92,25 +105,15 @@ export async function handleProviderError(
 /**
  * Handle rate limit (429) error
  */
-function handleRateLimit(
-	classified: ClassifiedError,
-	provider: string,
-	isPaidMode: boolean,
-	_ctx: {
-		ui: {
-			notify: (message: string, type: "info" | "warning" | "error") => void;
-		};
-		model?: { provider?: string; id?: string };
-	},
-	_pi: ExtensionAPI,
-	autoSwitchConfig?: Partial<AutoSwitchConfig>,
-): FailoverResult {
-	_logger.info(`Rate limit on ${provider}`, { isPaidMode, model: _ctx.model });
+function handleRateLimit(opts: ErrorHandlerOptions): FailoverResult {
+	const { classified, provider, isPaidMode, ctx, autoSwitch: autoSwitchConfig } = opts;
+
+	_logger.info(`Rate limit on ${provider}`, { isPaidMode, model: ctx.model });
 
 	const waitTime = Math.round((classified.retryAfterMs ?? 60000) / 1000);
 
 	// Auto-switch is enabled by default unless explicitly disabled
-	if (autoSwitchConfig?.enabled !== false && _ctx.model?.id) {
+	if (autoSwitchConfig?.enabled !== false && ctx.model?.id) {
 		_logger.info("Attempting auto-switch for rate limit");
 		// Note: Actual switching happens in provider-helper.ts turn_end handler
 		// This just signals that a switch is possible
@@ -133,22 +136,13 @@ function handleRateLimit(
 /**
  * Handle capacity error (provider overloaded)
  */
-function handleCapacityError(
-	classified: ClassifiedError,
-	provider: string,
-	_ctx: {
-		ui: {
-			notify: (message: string, type: "info" | "warning" | "error") => void;
-		};
-		model?: { provider?: string; id?: string };
-	},
-	_pi: ExtensionAPI,
-	autoSwitchConfig?: Partial<AutoSwitchConfig>,
-): FailoverResult {
-	_logger.info(`Capacity error on ${provider}`, { model: _ctx.model });
+function handleCapacityError(opts: ErrorHandlerOptions): FailoverResult {
+	const { classified, provider, ctx, autoSwitch: autoSwitchConfig } = opts;
+
+	_logger.info(`Capacity error on ${provider}`, { model: ctx.model });
 
 	// Auto-switch is enabled by default unless explicitly disabled
-	if (autoSwitchConfig?.enabled !== false && _ctx.model?.id) {
+	if (autoSwitchConfig?.enabled !== false && ctx.model?.id) {
 		_logger.info("Attempting auto-switch for capacity error");
 		return {
 			action: "switch",

@@ -55,7 +55,7 @@ describe("Cline Provider", () => {
 					id: "claude-3-5-sonnet",
 					name: "Claude 3.5 Sonnet",
 					reasoning: true,
-					input: ["text"],
+					input: ["text" as const],
 					cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 					contextWindow: 200000,
 					maxTokens: 8192,

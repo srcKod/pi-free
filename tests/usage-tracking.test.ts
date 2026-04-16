@@ -19,7 +19,7 @@ describe("Usage Tracking", () => {
 
 	describe("incrementModelRequestCount", () => {
 		it("should track model requests", () => {
-			incrementModelRequestCount("kilo", "gpt-4", 100, 50);
+			incrementModelRequestCount({ provider: "kilo", modelId: "gpt-4", tokensIn: 100, tokensOut: 50 });
 
 			const usage = getModelUsage("kilo", "gpt-4");
 			expect(usage).toBeDefined();
@@ -29,8 +29,8 @@ describe("Usage Tracking", () => {
 		});
 
 		it("should accumulate multiple requests", () => {
-			incrementModelRequestCount("kilo", "gpt-4", 100, 50);
-			incrementModelRequestCount("kilo", "gpt-4", 200, 100);
+			incrementModelRequestCount({ provider: "kilo", modelId: "gpt-4", tokensIn: 100, tokensOut: 50 });
+			incrementModelRequestCount({ provider: "kilo", modelId: "gpt-4", tokensIn: 200, tokensOut: 100 });
 
 			const usage = getModelUsage("kilo", "gpt-4");
 			expect(usage?.count).toBe(2);
@@ -39,16 +39,16 @@ describe("Usage Tracking", () => {
 		});
 
 		it("should track different models separately", () => {
-			incrementModelRequestCount("kilo", "gpt-4", 100, 50);
-			incrementModelRequestCount("kilo", "claude-3", 200, 100);
+			incrementModelRequestCount({ provider: "kilo", modelId: "gpt-4", tokensIn: 100, tokensOut: 50 });
+			incrementModelRequestCount({ provider: "kilo", modelId: "claude-3", tokensIn: 200, tokensOut: 100 });
 
 			expect(getModelUsage("kilo", "gpt-4")?.count).toBe(1);
 			expect(getModelUsage("kilo", "claude-3")?.count).toBe(1);
 		});
 
 		it("should track different providers separately", () => {
-			incrementModelRequestCount("kilo", "gpt-4", 100, 50);
-			incrementModelRequestCount("openrouter", "gpt-4", 200, 100);
+			incrementModelRequestCount({ provider: "kilo", modelId: "gpt-4", tokensIn: 100, tokensOut: 50 });
+			incrementModelRequestCount({ provider: "openrouter", modelId: "gpt-4", tokensIn: 200, tokensOut: 100 });
 
 			expect(getModelUsage("kilo", "gpt-4")?.count).toBe(1);
 			expect(getModelUsage("openrouter", "gpt-4")?.count).toBe(1);
@@ -57,9 +57,9 @@ describe("Usage Tracking", () => {
 
 	describe("getProviderModelUsage", () => {
 		it("should return all models for provider", () => {
-			incrementModelRequestCount("kilo", "model-a", 100, 50);
-			incrementModelRequestCount("kilo", "model-b", 200, 100);
-			incrementModelRequestCount("openrouter", "model-c", 300, 150);
+			incrementModelRequestCount({ provider: "kilo", modelId: "model-a", tokensIn: 100, tokensOut: 50 });
+			incrementModelRequestCount({ provider: "kilo", modelId: "model-b", tokensIn: 200, tokensOut: 100 });
+			incrementModelRequestCount({ provider: "openrouter", modelId: "model-c", tokensIn: 300, tokensOut: 150 });
 
 			const kiloModels = getProviderModelUsage("kilo");
 			expect(kiloModels).toHaveLength(2);
@@ -68,10 +68,10 @@ describe("Usage Tracking", () => {
 		});
 
 		it("should sort by count descending", () => {
-			incrementModelRequestCount("kilo", "popular", 100, 50);
-			incrementModelRequestCount("kilo", "popular", 100, 50);
-			incrementModelRequestCount("kilo", "popular", 100, 50);
-			incrementModelRequestCount("kilo", "unpopular", 100, 50);
+			incrementModelRequestCount({ provider: "kilo", modelId: "popular", tokensIn: 100, tokensOut: 50 });
+			incrementModelRequestCount({ provider: "kilo", modelId: "popular", tokensIn: 100, tokensOut: 50 });
+			incrementModelRequestCount({ provider: "kilo", modelId: "popular", tokensIn: 100, tokensOut: 50 });
+			incrementModelRequestCount({ provider: "kilo", modelId: "unpopular", tokensIn: 100, tokensOut: 50 });
 
 			const models = getProviderModelUsage("kilo");
 			expect(models[0].modelId).toBe("popular");
@@ -83,10 +83,10 @@ describe("Usage Tracking", () => {
 		it("should return top N models across providers", () => {
 			// Add many models
 			for (let i = 0; i < 5; i++) {
-				incrementModelRequestCount("kilo", `kilo-model-${i}`, 100, 50);
+				incrementModelRequestCount({ provider: "kilo", modelId: `kilo-model-${i}`, tokensIn: 100, tokensOut: 50 });
 			}
 			for (let i = 0; i < 5; i++) {
-				incrementModelRequestCount("openrouter", `or-model-${i}`, 100, 50);
+				incrementModelRequestCount({ provider: "openrouter", modelId: `or-model-${i}`, tokensIn: 100, tokensOut: 50 });
 			}
 
 			const top5 = getTopModels(5);
@@ -94,10 +94,10 @@ describe("Usage Tracking", () => {
 		});
 
 		it("should sort by total count", () => {
-			incrementModelRequestCount("kilo", "high-usage", 100, 50);
-			incrementModelRequestCount("kilo", "high-usage", 100, 50);
-			incrementModelRequestCount("kilo", "high-usage", 100, 50);
-			incrementModelRequestCount("kilo", "low-usage", 100, 50);
+			incrementModelRequestCount({ provider: "kilo", modelId: "high-usage", tokensIn: 100, tokensOut: 50 });
+			incrementModelRequestCount({ provider: "kilo", modelId: "high-usage", tokensIn: 100, tokensOut: 50 });
+			incrementModelRequestCount({ provider: "kilo", modelId: "high-usage", tokensIn: 100, tokensOut: 50 });
+			incrementModelRequestCount({ provider: "kilo", modelId: "low-usage", tokensIn: 100, tokensOut: 50 });
 
 			const top = getTopModels(2);
 			expect(top[0].modelId).toBe("high-usage");
@@ -107,8 +107,8 @@ describe("Usage Tracking", () => {
 
 	describe("getSessionUsage", () => {
 		it("should return session stats", () => {
-			incrementModelRequestCount("kilo", "gpt-4", 1000, 500);
-			incrementModelRequestCount("openrouter", "claude", 2000, 1000);
+			incrementModelRequestCount({ provider: "kilo", modelId: "gpt-4", tokensIn: 1000, tokensOut: 500 });
+			incrementModelRequestCount({ provider: "openrouter", modelId: "claude", tokensIn: 2000, tokensOut: 1000 });
 
 			const session = getSessionUsage();
 			expect(session.totalRequests).toBe(2);
@@ -124,10 +124,10 @@ describe("Usage Tracking", () => {
 		});
 
 		it("should sort providers by request count", () => {
-			incrementModelRequestCount("kilo", "model", 100, 50);
-			incrementModelRequestCount("kilo", "model", 100, 50);
-			incrementModelRequestCount("kilo", "model", 100, 50);
-			incrementModelRequestCount("openrouter", "model", 100, 50);
+			incrementModelRequestCount({ provider: "kilo", modelId: "model", tokensIn: 100, tokensOut: 50 });
+			incrementModelRequestCount({ provider: "kilo", modelId: "model", tokensIn: 100, tokensOut: 50 });
+			incrementModelRequestCount({ provider: "kilo", modelId: "model", tokensIn: 100, tokensOut: 50 });
+			incrementModelRequestCount({ provider: "openrouter", modelId: "model", tokensIn: 100, tokensOut: 50 });
 
 			const session = getSessionUsage();
 			expect(session.providers[0].name).toBe("kilo");
@@ -137,7 +137,7 @@ describe("Usage Tracking", () => {
 
 	describe("resetUsageStats", () => {
 		it("should clear all stats", () => {
-			incrementModelRequestCount("kilo", "gpt-4", 100, 50);
+			incrementModelRequestCount({ provider: "kilo", modelId: "gpt-4", tokensIn: 100, tokensOut: 50 });
 			resetUsageStats();
 
 			const usage = getModelUsage("kilo", "gpt-4");

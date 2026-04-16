@@ -53,15 +53,18 @@ const cumulativeStore = createJSONStore<CumulativeUsage>(USAGE_FILE, {
 	grandTotalCost: 0,
 });
 
-export function persistUsage(
-	provider: string,
-	modelId: string,
-	tokensIn: number,
-	tokensOut: number,
-	cacheRead: number,
-	cacheWrite: number,
-	cost: number,
-): void {
+export interface UsageEntry {
+	provider: string;
+	modelId: string;
+	tokensIn: number;
+	tokensOut: number;
+	cacheRead: number;
+	cacheWrite: number;
+	cost: number;
+}
+
+export function persistUsage(entry: UsageEntry): void {
+	const { provider, modelId, tokensIn, tokensOut, cacheRead, cacheWrite, cost } = entry;
 	const data = cumulativeStore.load();
 	const now = new Date().toISOString();
 

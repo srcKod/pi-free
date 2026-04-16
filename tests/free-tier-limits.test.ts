@@ -1,17 +1,19 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
 	FREE_TIER_LIMITS,
-	formatFreeTierStatus,
 	getFreeTierUsage,
 	getLimitWarning,
+	isApproachingLimit,
+} from "../usage/limits.ts";
+import { formatFreeTierStatus } from "../usage/formatters.ts";
+import {
 	getModelUsage,
 	getProviderModelUsage,
 	getSessionUsage,
 	getTopModels,
 	incrementModelRequestCount,
-	isApproachingLimit,
 	resetUsageStats,
-} from "../usage/limits.ts";
+} from "../usage/tracking.ts";
 
 describe("Free Tier Limits", () => {
 	beforeEach(() => {
@@ -45,13 +47,13 @@ describe("Free Tier Limits", () => {
 		it("should increment request count", () => {
 			// Just verify it doesn't throw
 			expect(() => {
-				incrementModelRequestCount("kilo", "gpt-4", 100, 50);
+				incrementModelRequestCount({ provider: "kilo", modelId: "gpt-4", tokensIn: 100, tokensOut: 50 });
 			}).not.toThrow();
 		});
 
 		it("should track model usage", () => {
-			incrementModelRequestCount("test", "model-1", 100, 50);
-			incrementModelRequestCount("test", "model-1", 200, 100);
+			incrementModelRequestCount({ provider: "test", modelId: "model-1", tokensIn: 100, tokensOut: 50 });
+			incrementModelRequestCount({ provider: "test", modelId: "model-1", tokensIn: 200, tokensOut: 100 });
 
 			const usage = getModelUsage("test", "model-1");
 			expect(usage).toBeDefined();
@@ -66,8 +68,8 @@ describe("Free Tier Limits", () => {
 		});
 
 		it("should track different models separately", () => {
-			incrementModelRequestCount("test", "model-a", 100, 50);
-			incrementModelRequestCount("test", "model-b", 200, 100);
+			incrementModelRequestCount({ provider: "test", modelId: "model-a", tokensIn: 100, tokensOut: 50 });
+			incrementModelRequestCount({ provider: "test", modelId: "model-b", tokensIn: 200, tokensOut: 100 });
 
 			expect(getModelUsage("test", "model-a")?.count).toBe(1);
 			expect(getModelUsage("test", "model-b")?.count).toBe(1);
@@ -76,8 +78,8 @@ describe("Free Tier Limits", () => {
 
 	describe("Provider Model Usage", () => {
 		it("should return all models for a provider", () => {
-			incrementModelRequestCount("test-provider", "model-1", 100, 50);
-			incrementModelRequestCount("test-provider", "model-2", 200, 100);
+			incrementModelRequestCount({ provider: "test-provider", modelId: "model-1", tokensIn: 100, tokensOut: 50 });
+			incrementModelRequestCount({ provider: "test-provider", modelId: "model-2", tokensIn: 200, tokensOut: 100 });
 
 			const models = getProviderModelUsage("test-provider");
 			expect(models).toHaveLength(2);
@@ -95,9 +97,9 @@ describe("Free Tier Limits", () => {
 		it("should return top N models by request count", () => {
 			// Add many models with varying request counts
 			for (let i = 0; i < 5; i++) {
-				incrementModelRequestCount("test", "popular-model", 100, 50);
+				incrementModelRequestCount({ provider: "test", modelId: "popular-model", tokensIn: 100, tokensOut: 50 });
 			}
-			incrementModelRequestCount("test", "unpopular-model", 100, 50);
+			incrementModelRequestCount({ provider: "test", modelId: "unpopular-model", tokensIn: 100, tokensOut: 50 });
 
 			const top = getTopModels(2);
 			expect(top).toHaveLength(2);
@@ -109,7 +111,7 @@ describe("Free Tier Limits", () => {
 		it("should calculate usage for kilo provider", () => {
 			// Simulate requests (out of 200/hour limit)
 			for (let i = 0; i < 100; i++) {
-				incrementModelRequestCount("kilo", "gpt-4", 10, 10);
+				incrementModelRequestCount({ provider: "kilo", modelId: "gpt-4", tokensIn: 10, tokensOut: 10 });
 			}
 
 			const usage = getFreeTierUsage("kilo");
@@ -130,14 +132,14 @@ describe("Free Tier Limits", () => {
 			// Use openrouter with daily limit (1000/day)
 			// Add 750 requests = 75% which triggers warning
 			for (let i = 0; i < 750; i++) {
-				incrementModelRequestCount("openrouter", "gpt-4", 10, 10);
+				incrementModelRequestCount({ provider: "openrouter", modelId: "gpt-4", tokensIn: 10, tokensOut: 10 });
 			}
 
 			expect(isApproachingLimit("openrouter")).toBe(true);
 		});
 
 		it("should not trigger warning when usage is low", () => {
-			incrementModelRequestCount("kilo", "gpt-4", 10, 10);
+			incrementModelRequestCount({ provider: "kilo", modelId: "gpt-4", tokensIn: 10, tokensOut: 10 });
 			expect(isApproachingLimit("kilo")).toBe(false);
 		});
 
@@ -145,7 +147,7 @@ describe("Free Tier Limits", () => {
 			// Use openrouter with daily limit (1000/day)
 			// Add 750 requests = 75% which triggers warning
 			for (let i = 0; i < 750; i++) {
-				incrementModelRequestCount("openrouter", "gpt-4", 10, 10);
+				incrementModelRequestCount({ provider: "openrouter", modelId: "gpt-4", tokensIn: 10, tokensOut: 10 });
 			}
 
 			const warning = getLimitWarning("openrouter");
@@ -161,8 +163,8 @@ describe("Free Tier Limits", () => {
 
 	describe("Session Usage", () => {
 		it("should generate session report", () => {
-			incrementModelRequestCount("kilo", "gpt-4", 1000, 500);
-			incrementModelRequestCount("openrouter", "mimo", 500, 250);
+			incrementModelRequestCount({ provider: "kilo", modelId: "gpt-4", tokensIn: 1000, tokensOut: 500 });
+			incrementModelRequestCount({ provider: "openrouter", modelId: "mimo", tokensIn: 500, tokensOut: 250 });
 
 			const report = getSessionUsage();
 			expect(report.totalRequests).toBe(2);
@@ -171,8 +173,8 @@ describe("Free Tier Limits", () => {
 		});
 
 		it("should track providers in session report", () => {
-			incrementModelRequestCount("kilo", "gpt-4", 100, 50);
-			incrementModelRequestCount("openrouter", "mimo", 100, 50);
+			incrementModelRequestCount({ provider: "kilo", modelId: "gpt-4", tokensIn: 100, tokensOut: 50 });
+			incrementModelRequestCount({ provider: "openrouter", modelId: "mimo", tokensIn: 100, tokensOut: 50 });
 
 			const report = getSessionUsage();
 			const providerNames = report.providers.map((p) => p.name);
