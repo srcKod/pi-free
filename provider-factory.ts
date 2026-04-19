@@ -27,18 +27,19 @@ import {
 	FIREWORKS_SHOW_PAID,
 	MISTRAL_API_KEY,
 	MISTRAL_SHOW_PAID,
+	MODAL_API_KEY,
 	NVIDIA_API_KEY,
 	NVIDIA_SHOW_PAID,
 	OLLAMA_API_KEY,
 	OLLAMA_SHOW_PAID,
 	OPENCODE_API_KEY,
 	ZEN_SHOW_PAID,
-	MODAL_API_KEY,
 } from "./config.ts";
 import { createLogger } from "./lib/logger.ts";
 import { logWarning } from "./lib/util.ts";
 import {
 	createReRegister,
+	enhanceWithCI,
 	type StoredModels,
 	setupProvider,
 } from "./provider-helper.ts";
@@ -181,7 +182,7 @@ export async function createProvider(
 			"User-Agent": "pi-free-providers",
 			...def.extraHeaders,
 		},
-		models,
+		models: enhanceWithCI(models),
 	});
 
 	// 8. Setup boilerplate

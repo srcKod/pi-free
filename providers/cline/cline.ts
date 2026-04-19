@@ -15,8 +15,9 @@
 import type { OAuthCredentials } from "@mariozechner/pi-ai";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { BASE_URL_CLINE, PROVIDER_CLINE } from "../../constants.ts";
-import { incrementRequestCount } from "../../usage/metrics.ts";
 import { logWarning } from "../../lib/util.ts";
+import { enhanceWithCI } from "../../provider-helper.ts";
+import { incrementRequestCount } from "../../usage/metrics.ts";
 import { loginCline, refreshClineToken } from "./cline-auth.ts";
 import { fetchClineModels } from "./cline-models.ts";
 
@@ -204,7 +205,7 @@ export default async function (pi: ExtensionAPI) {
 			api: "openai-completions" as const,
 			authHeader: false,
 			headers: buildClineHeaders(),
-			models: m,
+			models: enhanceWithCI(m),
 			oauth: {
 				name: "Cline",
 				login: loginCline,

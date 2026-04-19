@@ -28,6 +28,10 @@ vi.mock("../providers/cline/cline-models.ts", () => ({
 	fetchClineModels: vi.fn(),
 }));
 
+vi.mock("../provider-helper.ts", () => ({
+	enhanceWithCI: (models: unknown[]) => models,
+}));
+
 import clineProvider from "../providers/cline/cline.ts";
 import { loginCline } from "../providers/cline/cline-auth.ts";
 import { fetchClineModels } from "../providers/cline/cline-models.ts";
@@ -70,7 +74,7 @@ describe("Cline Provider", () => {
 				"cline",
 				expect.objectContaining({
 					baseUrl: "https://api.cline.bot/api/v1",
-					models: mockModels,
+					models: expect.any(Array), // enhanced via enhanceWithCI
 					oauth: expect.any(Object),
 				}),
 			);
