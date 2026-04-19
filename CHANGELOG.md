@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Toggle with `/go-toggle`
 
 ### Fixed
+- **All providers now show Coding Index scores in model selector** — Added `enhanceWithCI()` to factory-based providers (nvidia, fireworks, mistral, modal, ollama) and cline. Now all providers display CI scores in `/models` command (pi-models extension).
+
 - **All providers now show in `--list-models`** — Providers (zen, openrouter, go) that registered models only in `session_start` were missing from `pi --list-models` which runs before session starts. Added immediate registration for these providers:
   - **zen**: Added model caching to `~/.pi/provider-cache.json` for immediate registration + dynamic refresh
   - **openrouter**: Immediate model registration at extension load (like kilo/cline)
