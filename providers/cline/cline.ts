@@ -17,7 +17,6 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { BASE_URL_CLINE, PROVIDER_CLINE } from "../../constants.ts";
 import { logWarning } from "../../lib/util.ts";
 import { enhanceWithCI } from "../../provider-helper.ts";
-import { incrementRequestCount } from "../../usage/metrics.ts";
 import { loginCline, refreshClineToken } from "./cline-auth.ts";
 import { fetchClineModels } from "./cline-models.ts";
 
@@ -248,11 +247,5 @@ export default async function (pi: ExtensionAPI) {
 		} catch (err) {
 			logWarning("cline", "Failed to refresh models at session start", err);
 		}
-	});
-
-	// Keep lightweight request counting for now (internal only).
-	pi.on("turn_end", async (_event, ctx) => {
-		if (ctx.model?.provider !== PROVIDER_CLINE) return;
-		incrementRequestCount(PROVIDER_CLINE);
 	});
 }

@@ -31,10 +31,6 @@ vi.mock("../provider-helper.ts", () => ({
 	createCtxReRegister: vi.fn(() => vi.fn()),
 }));
 
-vi.mock("../usage/widget.ts", () => ({
-	registerUsageWidget: vi.fn(),
-}));
-
 vi.mock("../lib/util.ts", () => ({
 	cleanModelName: (name: string) => name,
 	logWarning: vi.fn(),
@@ -121,7 +117,9 @@ describe("Kilo toggle behavior", () => {
 		];
 
 		// Before toggle, should stay free-only
-		const beforeToggle = oauth.modifyModels(templateModels, { access: "oauth-token" });
+		const beforeToggle = oauth.modifyModels(templateModels, {
+			access: "oauth-token",
+		});
 		expect(beforeToggle).toBe(templateModels);
 
 		const setupConfig = mockSetupProvider.mock.calls[0][1];
@@ -132,7 +130,9 @@ describe("Kilo toggle behavior", () => {
 		// Simulate /kilo-toggle -> paid mode
 		setupConfig.reRegister(stored.all);
 
-		const afterToggle = oauth.modifyModels(templateModels, { access: "oauth-token" });
+		const afterToggle = oauth.modifyModels(templateModels, {
+			access: "oauth-token",
+		});
 		expect(afterToggle).not.toBe(templateModels);
 		expect(afterToggle.map((m: { id: string }) => m.id)).toEqual(
 			expect.arrayContaining(["mimo-v2-pro-free", "claude-3-7-sonnet"]),

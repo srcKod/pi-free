@@ -11,11 +11,7 @@ vi.mock("../constants.ts", () => ({
 	PROVIDER_CLINE: "cline",
 }));
 
-vi.mock("../metrics.ts", () => ({
-	incrementRequestCount: vi.fn(),
-}));
-
-vi.mock("../util.ts", () => ({
+vi.mock("../lib/util.ts", () => ({
 	logWarning: vi.fn(),
 }));
 

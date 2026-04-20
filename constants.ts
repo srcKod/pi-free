@@ -4,31 +4,21 @@
  */
 
 // =============================================================================
-// Provider names (must match registerProvider calls)
+// Provider names (unique providers NOT built into pi)
 // =============================================================================
 
 export const PROVIDER_KILO = "kilo";
-export const PROVIDER_ZEN = "zen";
-export const PROVIDER_GO = "go";
-export const PROVIDER_OPENROUTER = "openrouter";
-export const PROVIDER_NVIDIA = "nvidia";
 export const PROVIDER_CLINE = "cline";
 export const PROVIDER_FIREWORKS = "fireworks";
-export const PROVIDER_OLLAMA = "ollama";
-export const PROVIDER_MISTRAL = "mistral";
+export const PROVIDER_NVIDIA = "nvidia";
 export const PROVIDER_QWEN = "qwen";
 export const PROVIDER_MODAL = "modal";
 
-export const ALL_PROVIDERS = [
+export const ALL_UNIQUE_PROVIDERS = [
 	PROVIDER_KILO,
-	PROVIDER_ZEN,
-	PROVIDER_GO,
-	PROVIDER_OPENROUTER,
-	PROVIDER_NVIDIA,
 	PROVIDER_CLINE,
 	PROVIDER_FIREWORKS,
-	PROVIDER_MISTRAL,
-	PROVIDER_OLLAMA,
+	PROVIDER_NVIDIA,
 	PROVIDER_QWEN,
 	PROVIDER_MODAL,
 ] as const;
@@ -38,14 +28,15 @@ export const ALL_PROVIDERS = [
 // =============================================================================
 
 export const BASE_URL_KILO = "https://api.kilo.ai/api/gateway";
-export const BASE_URL_ZEN = "https://opencode.ai/zen/v1";
-export const BASE_URL_GO = "https://opencode.ai/zen/go/v1";
-export const BASE_URL_OPENROUTER = "https://openrouter.ai/api/v1";
 export const BASE_URL_NVIDIA = "https://integrate.api.nvidia.com/v1";
 export const BASE_URL_CLINE = "https://api.cline.bot/api/v1";
 export const BASE_URL_FIREWORKS = "https://api.fireworks.ai/inference/v1";
-export const BASE_URL_OLLAMA = "https://ollama.com/v1";
 export const BASE_URL_MODAL = "https://api.us-west-2.modal.direct/v1";
+export const BASE_URL_QWEN =
+	"https://dashscope.aliyuncs.com/compatible-mode/v1";
+
+/** Cline fetches free models from OpenRouter */
+export const BASE_URL_OPENROUTER = "https://openrouter.ai/api/v1";
 
 // =============================================================================
 // External URLs
@@ -53,12 +44,9 @@ export const BASE_URL_MODAL = "https://api.us-west-2.modal.direct/v1";
 
 export const URL_MODELS_DEV = "https://models.dev/api.json";
 export const URL_KILO_TOS = "https://kilo.ai/terms";
-export const URL_ZEN_TOS = "https://opencode.ai/terms";
-export const URL_GO_TOS = "https://opencode.ai/terms";
 export const URL_CLINE_TOS = "https://cline.bot/tos";
 export const URL_QWEN_TOS = "https://terms.alicloud.com/";
 export const URL_MODAL_TOS = "https://modal.com/terms";
-export const BASE_URL_QWEN = "https://dashscope.aliyuncs.com/compatible-mode/v1";
 
 // =============================================================================
 // Cline auth
@@ -77,7 +65,7 @@ export const DEFAULT_MIN_SIZE_B = 30; // Default minimum model size for filterin
 // Timeouts (milliseconds)
 // =============================================================================
 
-// Timeout for fetch operations
+/** Timeout for fetch operations */
 export const DEFAULT_FETCH_TIMEOUT_MS: number = 10_000;
 
 export interface TestConfig {
@@ -102,22 +90,15 @@ export function calculateTimeout(base: number): number {
 export function unusedParamTest(required: string, _unused: number): string {
 	return required.toUpperCase();
 }
+
 export const KILO_POLL_INTERVAL_MS = 3_000;
 export const KILO_TOKEN_EXPIRATION_MS = 365 * 24 * 60 * 60 * 1000; // 1 year
 
 // =============================================================================
-// Additional OpenAI-compatible providers
+// Removed providers (now built into pi):
+// - openrouter: use pi's built-in with OPENROUTER_API_KEY
+// - zen/opencode: use pi's built-in with OPENCODE_API_KEY
+// - go/opencode-go: use pi's built-in with OPENCODE_API_KEY
+// - mistral: use pi's built-in with MISTRAL_API_KEY
+// - ollama: add to ~/.pi/agent/models.json as custom provider
 // =============================================================================
-
-export const PROVIDER_GROQ = "groq";
-export const PROVIDER_TOGETHER = "together";
-export const PROVIDER_DEEPINFRA = "deepinfra";
-export const PROVIDER_PERPLEXITY = "perplexity";
-export const PROVIDER_XAI = "xai";
-
-export const BASE_URL_GROQ = "https://api.groq.com/openai/v1";
-export const BASE_URL_TOGETHER = "https://api.together.xyz/v1";
-export const BASE_URL_DEEPINFRA = "https://api.deepinfra.com/v1/openai";
-export const BASE_URL_MISTRAL = "https://api.mistral.ai/v1";
-export const BASE_URL_PERPLEXITY = "https://api.perplexity.ai";
-export const BASE_URL_XAI = "https://api.x.ai/v1";

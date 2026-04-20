@@ -27,10 +27,6 @@ vi.mock("../provider-helper.ts", () => ({
 	enhanceWithCI: (models: unknown[]) => models,
 }));
 
-vi.mock("../usage/widget.ts", () => ({
-	registerUsageWidget: vi.fn(),
-}));
-
 vi.mock("../lib/util.ts", () => ({
 	logWarning: vi.fn(),
 }));
