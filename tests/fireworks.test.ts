@@ -5,6 +5,45 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Mock fetch response for Fireworks API
+const mockFireworksModelsResponse = {
+	object: "list",
+	data: [
+		{
+			id: "accounts/fireworks/models/deepseek-v3p2",
+			object: "model",
+			owned_by: "fireworks",
+			created: 1764602280,
+			kind: "HF_BASE_MODEL",
+			supports_chat: true,
+			supports_image_input: false,
+			supports_tools: true,
+			context_length: 163840,
+		},
+		{
+			id: "accounts/fireworks/models/kimi-k2p5",
+			object: "model",
+			owned_by: "fireworks",
+			created: 1769476770,
+			kind: "HF_BASE_MODEL",
+			supports_chat: true,
+			supports_image_input: true,
+			supports_tools: true,
+			context_length: 262144,
+		},
+		{
+			id: "accounts/fireworks/models/flux-1-schnell-fp8",
+			object: "model",
+			owned_by: "fireworks",
+			created: 1729535376,
+			kind: "FLUMINA_BASE_MODEL",
+			supports_chat: false, // Should be filtered out
+			supports_image_input: false,
+			supports_tools: false,
+		},
+	],
+};
+
 // Mock dependencies
 vi.mock("../config.ts", () => ({
 	FIREWORKS_API_KEY: "test-fireworks-key",
@@ -15,10 +54,18 @@ vi.mock("../config.ts", () => ({
 
 vi.mock("../constants.ts", () => ({
 	BASE_URL_FIREWORKS: "https://api.fireworks.ai/inference/v1",
+	DEFAULT_FETCH_TIMEOUT_MS: 10000,
+}));
+
+vi.mock("../index.ts", () => ({
+	registerWithGlobalToggle: vi.fn(),
+	isFreeModel: (m: any) => (m.cost?.input ?? 0) === 0,
+	getGlobalFreeOnly: () => false,
 }));
 
 vi.mock("../provider-helper.ts", () => ({
 	enhanceWithCI: (models: unknown[]) => models,
+	createReRegister: () => vi.fn(),
 }));
 
 vi.mock("../lib/logger.ts", () => ({
@@ -30,6 +77,12 @@ vi.mock("../lib/logger.ts", () => ({
 	}),
 }));
 
+// Mock fetchWithRetry
+const mockFetchWithRetry = vi.fn();
+vi.mock("../lib/util.ts", () => ({
+	fetchWithRetry: (...args: any[]) => mockFetchWithRetry(...args),
+}));
+
 import type { ProviderModelConfig } from "@mariozechner/pi-coding-agent";
 
 describe("Fireworks Provider", () => {
@@ -39,6 +92,7 @@ describe("Fireworks Provider", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		mockRegisterProvider = vi.fn();
+		mockFetchWithRetry.mockReset();
 
 		mockPi = {
 			registerProvider: mockRegisterProvider,
@@ -47,7 +101,12 @@ describe("Fireworks Provider", () => {
 	});
 
 	describe("initialization", () => {
-		it("should register provider with hardcoded models", async () => {
+		it("should register provider with fetched models", async () => {
+			mockFetchWithRetry.mockResolvedValue({
+				ok: true,
+				json: () => Promise.resolve(mockFireworksModelsResponse),
+			});
+
 			const { default: fireworksProvider } = await import(
 				"../providers/fireworks/fireworks.ts"
 			);
@@ -66,6 +125,10 @@ describe("Fireworks Provider", () => {
 
 		it("should set API key in environment", async () => {
 			delete process.env.FIREWORKS_API_KEY;
+			mockFetchWithRetry.mockResolvedValue({
+				ok: true,
+				json: () => Promise.resolve(mockFireworksModelsResponse),
+			});
 
 			const { default: fireworksProvider } = await import(
 				"../providers/fireworks/fireworks.ts"
@@ -76,7 +139,7 @@ describe("Fireworks Provider", () => {
 		});
 
 		it("should skip registration without API key", async () => {
-			// Mock no API key by temporarily clearing the module
+			// Mock no API key
 			const apiKeySpy = vi
 				.spyOn(await import("../config.ts"), "FIREWORKS_API_KEY", "get")
 				.mockReturnValue(undefined as any);
@@ -86,16 +149,18 @@ describe("Fireworks Provider", () => {
 			);
 			await fireworksProvider(mockPi);
 
-			// Should not register provider
 			expect(mockRegisterProvider).not.toHaveBeenCalled();
-
-			// Restore the mock so subsequent tests have the API key
 			apiKeySpy.mockRestore();
 		});
 	});
 
 	describe("model configuration", () => {
-		it("should have hardcoded models with correct structure", async () => {
+		it("should have dynamically fetched models with correct structure", async () => {
+			mockFetchWithRetry.mockResolvedValue({
+				ok: true,
+				json: () => Promise.resolve(mockFireworksModelsResponse),
+			});
+
 			const { default: fireworksProvider } = await import(
 				"../providers/fireworks/fireworks.ts"
 			);
@@ -107,7 +172,8 @@ describe("Fireworks Provider", () => {
 			const models: ProviderModelConfig[] = registerCall?.[1]?.models;
 
 			expect(models).toBeInstanceOf(Array);
-			expect(models.length).toBeGreaterThan(0);
+			// Should only have chat-capable models (2 from mock, 1 filtered out)
+			expect(models.length).toBe(2);
 
 			// Check first model has required properties
 			const firstModel = models[0];
@@ -118,10 +184,81 @@ describe("Fireworks Provider", () => {
 			expect(firstModel).toHaveProperty("cost");
 			expect(firstModel).toHaveProperty("contextWindow");
 			expect(firstModel).toHaveProperty("maxTokens");
+		});
 
-			// Verify non-zero costs (paid model, not free)
-			expect(firstModel.cost.input).toBeGreaterThan(0);
-			expect(firstModel.cost.output).toBeGreaterThan(0);
+		it("should filter non-chat models", async () => {
+			mockFetchWithRetry.mockResolvedValue({
+				ok: true,
+				json: () => Promise.resolve(mockFireworksModelsResponse),
+			});
+
+			const { default: fireworksProvider } = await import(
+				"../providers/fireworks/fireworks.ts"
+			);
+			await fireworksProvider(mockPi);
+
+			const registerCall = mockRegisterProvider.mock.calls[0];
+			const models: ProviderModelConfig[] = registerCall?.[1]?.models;
+
+			// Should not include the flux model (supports_chat: false)
+			const fluxModel = models.find((m) => m.id.includes("flux"));
+			expect(fluxModel).toBeUndefined();
+		});
+
+		it("should identify vision models correctly", async () => {
+			mockFetchWithRetry.mockResolvedValue({
+				ok: true,
+				json: () => Promise.resolve(mockFireworksModelsResponse),
+			});
+
+			const { default: fireworksProvider } = await import(
+				"../providers/fireworks/fireworks.ts"
+			);
+			await fireworksProvider(mockPi);
+
+			const registerCall = mockRegisterProvider.mock.calls[0];
+			const models: ProviderModelConfig[] = registerCall?.[1]?.models;
+
+			// kimi-k2p5 supports vision
+			const visionModel = models.find((m) => m.id.includes("kimi-k2p5"));
+			expect(visionModel).toBeDefined();
+			expect(visionModel?.input).toContain("image");
+		});
+
+		it("should format model names correctly", async () => {
+			mockFetchWithRetry.mockResolvedValue({
+				ok: true,
+				json: () => Promise.resolve(mockFireworksModelsResponse),
+			});
+
+			const { default: fireworksProvider } = await import(
+				"../providers/fireworks/fireworks.ts"
+			);
+			await fireworksProvider(mockPi);
+
+			const registerCall = mockRegisterProvider.mock.calls[0];
+			const models: ProviderModelConfig[] = registerCall?.[1]?.models;
+
+			// Check name formatting
+			const deepseekModel = models.find((m) => m.id.includes("deepseek"));
+			expect(deepseekModel?.name).toBe("Deepseek V3.2");
+		});
+	});
+
+	describe("error handling", () => {
+		it("should handle API fetch errors gracefully", async () => {
+			// Reset module cache to get fresh import
+			mockFetchWithRetry.mockRejectedValue(new Error("API Error"));
+
+			const { default: fireworksProvider } = await import(
+				"../providers/fireworks/fireworks.ts?t=" + Date.now()
+			);
+
+			// Should not throw
+			await expect(fireworksProvider(mockPi)).resolves.not.toThrow();
+
+			// Should not register provider due to error
+			expect(mockRegisterProvider).not.toHaveBeenCalled();
 		});
 	});
 });
