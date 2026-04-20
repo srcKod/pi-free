@@ -18,7 +18,6 @@ import {
 	setupProvider,
 	createReRegister,
 } from "../../provider-helper.ts";
-import { incrementRequestCount } from "../../usage/metrics.ts";
 import { logWarning } from "../../lib/util.ts";
 import { createLogger } from "../../lib/logger.ts";
 import { loginQwen, refreshQwenToken, getQwenBaseUrl } from "./qwen-auth.ts";
@@ -147,7 +146,7 @@ export default async function (pi: ExtensionAPI) {
 	//
 	pi.on("turn_end", async (event, ctx) => {
 		if (ctx.model?.provider !== PROVIDER_QWEN) return;
-		incrementRequestCount(PROVIDER_QWEN);
+		// NOTE: Request counting removed - usage tracking was deleted in refactor
 
 		const msg = (
 			event as { message?: { role?: string; errorMessage?: string } }

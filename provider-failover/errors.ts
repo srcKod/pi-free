@@ -4,7 +4,6 @@
  */
 
 import { createLogger } from "../lib/logger.ts";
-import { getFreeTierUsage, getLimitWarning } from "../usage/limits.ts";
 
 const _logger = createLogger("failover");
 
@@ -259,17 +258,10 @@ export function logErrorClassification(
 /**
  * Log free tier usage when rate limit occurs
  * Helps users understand their quota consumption
+ * NOTE: Usage tracking removed - free tier limits now handled by providers
  */
 export function logFreeTierUsage(provider: string): void {
-	const usage = getFreeTierUsage(provider);
-	const warning = getLimitWarning(provider);
-
-	if (warning) {
-		_logger.warn(`Free tier warning: ${warning}`, { provider });
-	} else {
-		_logger.info(`${provider} usage`, {
-			requestsToday: usage.requestsToday,
-			limit: usage.limit.description,
-		});
-	}
+	_logger.info(
+		`${provider} rate limit encountered (free tier tracking disabled)`,
+	);
 }
