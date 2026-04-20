@@ -7,65 +7,68 @@
  *
  * Per-provider paid model flags:
  *   KILO_SHOW_PAID=true or kilo_show_paid: true
- *   OPENROUTER_SHOW_PAID=true or openrouter_show_paid: true
  *   NVIDIA_SHOW_PAID=true or nvidia_show_paid: true
  *   FIREWORKS_SHOW_PAID=true or fireworks_show_paid: true
  *   CLINE_SHOW_PAID=true or cline_show_paid: true
- *   GO_SHOW_PAID=true or go_show_paid: true
- *   OLLAMA_SHOW_PAID=true or ollama_show_paid: true
+ *   QWEN_SHOW_PAID=true or qwen_show_paid: true
+ *   MODAL_SHOW_PAID=true or modal_show_paid: true
  *
  * PI_FREE_KILO_FREE_ONLY=true — restrict Kilo to free models even after login.
+ *
+ * Global free-only mode (new in v2.0):
+ *   PI_FREE_ONLY=true or free_only: true — applies to ALL providers
+ *   Use /free command to toggle interactively
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+	PROVIDER_CLINE,
+	PROVIDER_FIREWORKS,
+	PROVIDER_KILO,
+	PROVIDER_MODAL,
+	PROVIDER_NVIDIA,
+	PROVIDER_QWEN,
+} from "./constants.ts";
 import { createLogger } from "./lib/logger.ts";
 
 const _logger = createLogger("config");
 
 interface PiFreeConfig {
-	openrouter_api_key?: string;
+	// API Keys
 	nvidia_api_key?: string;
-	opencode_api_key?: string;
-	opencode_go_api_key?: string;
 	fireworks_api_key?: string;
-	mistral_api_key?: string;
-	ollama_api_key?: string;
 	modal_api_key?: string;
+	opencode_api_key?: string; // Used by some providers
 	kilo_free_only?: boolean;
 	hidden_models?: string[];
+
+	// Global free-only mode (v2.0+)
+	free_only?: boolean;
+
 	// Per-provider paid model flags
 	kilo_show_paid?: boolean;
-	openrouter_show_paid?: boolean;
 	nvidia_show_paid?: boolean;
 	fireworks_show_paid?: boolean;
 	cline_show_paid?: boolean;
-	zen_show_paid?: boolean;
-	go_show_paid?: boolean;
-	mistral_show_paid?: boolean;
-	ollama_show_paid?: boolean;
+	qwen_show_paid?: boolean;
+	modal_show_paid?: boolean;
 }
 
 const CONFIG_TEMPLATE: PiFreeConfig = {
-	openrouter_api_key: "",
 	nvidia_api_key: "",
-	opencode_api_key: "",
-	opencode_go_api_key: "",
 	fireworks_api_key: "",
-	mistral_api_key: "",
-	ollama_api_key: "",
 	modal_api_key: "",
+	opencode_api_key: "",
 	kilo_free_only: false,
 	hidden_models: [],
+	free_only: true,
 	kilo_show_paid: false,
-	openrouter_show_paid: false,
 	nvidia_show_paid: false,
 	fireworks_show_paid: false,
 	cline_show_paid: false,
-	zen_show_paid: false,
-	go_show_paid: false,
-	mistral_show_paid: false,
-	ollama_show_paid: false,
+	qwen_show_paid: false,
+	modal_show_paid: false,
 };
 
 const PI_DIR = join(process.env.HOME || process.env.USERPROFILE || "", ".pi");
@@ -128,49 +131,34 @@ function resolveBool(envKey: string, fileVal?: boolean): boolean {
 	return fileVal === true;
 }
 
-// Global fallback (deprecated, use per-provider flags)
-// Returns true only if explicitly enabled via env var
-export const SHOW_PAID = process.env.PI_FREE_SHOW_PAID === "true";
-
 // Per-provider paid model flags - default to false (free-only) if not set
 export const KILO_SHOW_PAID = resolveBool(
 	"KILO_SHOW_PAID",
 	file.kilo_show_paid,
 );
-
-export const OPENROUTER_SHOW_PAID = resolveBool(
-	"OPENROUTER_SHOW_PAID",
-	file.openrouter_show_paid,
-);
-
 export const NVIDIA_SHOW_PAID = resolveBool(
 	"NVIDIA_SHOW_PAID",
 	file.nvidia_show_paid,
 );
-
 export const FIREWORKS_SHOW_PAID = resolveBool(
 	"FIREWORKS_SHOW_PAID",
 	file.fireworks_show_paid,
 );
-
 export const CLINE_SHOW_PAID = resolveBool(
 	"CLINE_SHOW_PAID",
 	file.cline_show_paid,
 );
-
-export const ZEN_SHOW_PAID = resolveBool("ZEN_SHOW_PAID", file.zen_show_paid);
-
-export const GO_SHOW_PAID = resolveBool("GO_SHOW_PAID", file.go_show_paid);
-
-export const MISTRAL_SHOW_PAID = resolveBool(
-	"MISTRAL_SHOW_PAID",
-	file.mistral_show_paid,
+export const QWEN_SHOW_PAID = resolveBool(
+	"QWEN_SHOW_PAID",
+	file.qwen_show_paid,
+);
+export const MODAL_SHOW_PAID = resolveBool(
+	"MODAL_SHOW_PAID",
+	file.modal_show_paid,
 );
 
-export const OLLAMA_SHOW_PAID = resolveBool(
-	"OLLAMA_SHOW_PAID",
-	file.ollama_show_paid,
-);
+// Global free-only mode (new in v2.0) - applies to ALL providers
+export const FREE_ONLY = resolveBool("PI_FREE_ONLY", file.free_only);
 
 export const KILO_FREE_ONLY = resolveBool(
 	"PI_FREE_KILO_FREE_ONLY",
@@ -185,41 +173,27 @@ export function applyHidden<T extends { id: string }>(models: T[]): T[] {
 	return models.filter((m) => !HIDDEN.has(m.id));
 }
 
-export const OPENROUTER_API_KEY = resolve(
-	"OPENROUTER_API_KEY",
-	file.openrouter_api_key,
-);
+// API Keys
 export const NVIDIA_API_KEY = resolve("NVIDIA_API_KEY", file.nvidia_api_key);
-export const OPENCODE_API_KEY = resolve(
-	"OPENCODE_API_KEY",
-	file.opencode_api_key,
-);
-export const OPENCODE_GO_API_KEY = resolve(
-	"OPENCODE_GO_API_KEY",
-	file.opencode_go_api_key,
-);
 export const FIREWORKS_API_KEY = resolve(
 	"FIREWORKS_API_KEY",
 	file.fireworks_api_key,
 );
-export const MISTRAL_API_KEY = resolve("MISTRAL_API_KEY", file.mistral_api_key);
-export const OLLAMA_API_KEY = resolve("OLLAMA_API_KEY", file.ollama_api_key);
 export const MODAL_API_KEY = resolve("MODAL_API_KEY", file.modal_api_key);
+export const OPENCODE_API_KEY = resolve(
+	"OPENCODE_API_KEY",
+	file.opencode_api_key,
+);
 
 // Re-export provider names for consistency
 export {
 	PROVIDER_CLINE,
 	PROVIDER_FIREWORKS,
-	PROVIDER_GO,
 	PROVIDER_KILO,
-	PROVIDER_MISTRAL,
-	PROVIDER_NVIDIA,
-	PROVIDER_OLLAMA,
-	PROVIDER_OPENROUTER,
-	PROVIDER_QWEN,
-	PROVIDER_ZEN,
 	PROVIDER_MODAL,
-} from "./constants.ts";
+	PROVIDER_NVIDIA,
+	PROVIDER_QWEN,
+};
 
 // =============================================================================
 // Config Persistence

@@ -25,15 +25,10 @@ import type {
 import {
 	FIREWORKS_API_KEY,
 	FIREWORKS_SHOW_PAID,
-	MISTRAL_API_KEY,
-	MISTRAL_SHOW_PAID,
 	MODAL_API_KEY,
 	NVIDIA_API_KEY,
 	NVIDIA_SHOW_PAID,
-	OLLAMA_API_KEY,
-	OLLAMA_SHOW_PAID,
 	OPENCODE_API_KEY,
-	ZEN_SHOW_PAID,
 } from "./config.ts";
 import { createLogger } from "./lib/logger.ts";
 import { logWarning } from "./lib/util.ts";
@@ -85,8 +80,6 @@ export interface ProviderDefinition {
 const API_KEY_GETTERS: Record<string, () => string | undefined> = {
 	nvidia_api_key: () => NVIDIA_API_KEY,
 	fireworks_api_key: () => FIREWORKS_API_KEY,
-	ollama_api_key: () => OLLAMA_API_KEY,
-	mistral_api_key: () => MISTRAL_API_KEY,
 	opencode_api_key: () => OPENCODE_API_KEY,
 	modal_api_key: () => MODAL_API_KEY,
 };
@@ -94,9 +87,6 @@ const API_KEY_GETTERS: Record<string, () => string | undefined> = {
 const SHOW_PAID_GETTERS: Record<string, () => boolean> = {
 	NVIDIA_SHOW_PAID: () => NVIDIA_SHOW_PAID,
 	FIREWORKS_SHOW_PAID: () => FIREWORKS_SHOW_PAID,
-	OLLAMA_SHOW_PAID: () => OLLAMA_SHOW_PAID,
-	MISTRAL_SHOW_PAID: () => MISTRAL_SHOW_PAID,
-	ZEN_SHOW_PAID: () => ZEN_SHOW_PAID,
 };
 
 // =============================================================================

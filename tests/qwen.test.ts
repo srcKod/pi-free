@@ -19,10 +19,6 @@ vi.mock("../provider-helper.ts", () => ({
 	setupProvider: vi.fn(),
 }));
 
-vi.mock("../usage/metrics.ts", () => ({
-	incrementRequestCount: vi.fn(),
-}));
-
 vi.mock("../lib/logger.ts", () => ({
 	createLogger: () => ({
 		warn: vi.fn(),
@@ -40,7 +36,9 @@ vi.mock("../providers/qwen/qwen-auth.ts", () => ({
 	loginQwen: vi.fn(),
 	refreshQwenToken: vi.fn(),
 	// Default: no resource_url → fallback DashScope (mirrors qwen-code behaviour)
-	getQwenBaseUrl: vi.fn(() => "https://dashscope.aliyuncs.com/compatible-mode/v1"),
+	getQwenBaseUrl: vi.fn(
+		() => "https://dashscope.aliyuncs.com/compatible-mode/v1",
+	),
 }));
 
 const PORTAL_COMPAT = {
@@ -86,7 +84,6 @@ vi.mock("../providers/qwen/qwen-models.ts", () => ({
 import { setupProvider } from "../provider-helper.ts";
 import { loginQwen } from "../providers/qwen/qwen-auth.ts";
 import { fetchQwenModels } from "../providers/qwen/qwen-models.ts";
-import { incrementRequestCount } from "../usage/metrics.ts";
 
 const MOCK_MODEL = {
 	id: "coder-model",
@@ -341,7 +338,19 @@ describe("Qwen OAuth Provider", () => {
 
 			const oauth = mockRegisterProvider.mock.calls[0][1].oauth;
 			const mockModels = [
-				{ id: "coder-model", name: "Qwen Coder", provider: "qwen", api: "openai-completions", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 131_072, maxTokens: 16_384, compat: PORTAL_COMPAT },
+				{
+					id: "coder-model",
+					name: "Qwen Coder",
+					provider: "qwen",
+					api: "openai-completions",
+					baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+					reasoning: false,
+					input: ["text" as const],
+					cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+					contextWindow: 131_072,
+					maxTokens: 16_384,
+					compat: PORTAL_COMPAT,
+				},
 			];
 
 			const result = oauth.modifyModels(mockModels, {
@@ -366,7 +375,18 @@ describe("Qwen OAuth Provider", () => {
 
 			const oauth = mockRegisterProvider.mock.calls[0][1].oauth;
 			const mockModels = [
-				{ id: "coder-model", name: "Qwen Coder", provider: "qwen", api: "openai-completions", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 131_072, maxTokens: 16_384 },
+				{
+					id: "coder-model",
+					name: "Qwen Coder",
+					provider: "qwen",
+					api: "openai-completions",
+					baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+					reasoning: false,
+					input: ["text" as const],
+					cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+					contextWindow: 131_072,
+					maxTokens: 16_384,
+				},
 			];
 
 			const result = oauth.modifyModels(mockModels, {
