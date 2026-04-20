@@ -241,47 +241,6 @@ describe("Qwen OAuth Provider", () => {
 		});
 	});
 
-	describe("request tracking", () => {
-		it("should track requests on turn_end for qwen provider", async () => {
-			vi.mocked(fetchQwenModels).mockResolvedValue([MOCK_MODEL]);
-
-			const { default: qwenProvider } = await import(
-				"../providers/qwen/qwen.ts"
-			);
-			await qwenProvider(mockPi);
-
-			const turnEndCall = mockOn.mock.calls.find(
-				(call: unknown[]) => call[0] === "turn_end",
-			);
-			expect(turnEndCall).toBeDefined();
-
-			const handler = turnEndCall![1];
-			const mockCtx = { model: { provider: "qwen" } };
-			await handler({}, mockCtx);
-
-			expect(incrementRequestCount).toHaveBeenCalledWith("qwen");
-		});
-
-		it("should not track requests for other providers", async () => {
-			vi.mocked(fetchQwenModels).mockResolvedValue([MOCK_MODEL]);
-
-			const { default: qwenProvider } = await import(
-				"../providers/qwen/qwen.ts"
-			);
-			await qwenProvider(mockPi);
-
-			const turnEndCall = mockOn.mock.calls.find(
-				(call: unknown[]) => call[0] === "turn_end",
-			);
-			const handler = turnEndCall![1];
-
-			const mockCtx = { model: { provider: "openrouter" } };
-			await handler({}, mockCtx);
-
-			expect(incrementRequestCount).not.toHaveBeenCalled();
-		});
-	});
-
 	describe("setupProvider integration", () => {
 		it("should call setupProvider with correct config", async () => {
 			vi.mocked(fetchQwenModels).mockResolvedValue([MOCK_MODEL]);

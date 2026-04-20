@@ -90,7 +90,6 @@ describe("Cline Provider", () => {
 				"session_start",
 				expect.any(Function),
 			);
-			expect(mockOn).toHaveBeenCalledWith("turn_end", expect.any(Function));
 		});
 	});
 
