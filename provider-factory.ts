@@ -2,7 +2,7 @@
  * Provider Factory
  *
  * Extracts the common boilerplate pattern repeated across providers:
- *   - API key check and env injection
+ *   - API key check
  *   - SHOW_PAID flag check
  *   - Model fetching with error handling
  *   - Provider registration
@@ -23,12 +23,12 @@ import type {
 	ProviderModelConfig,
 } from "@mariozechner/pi-coding-agent";
 import {
-	FIREWORKS_API_KEY,
-	FIREWORKS_SHOW_PAID,
-	MODAL_API_KEY,
-	NVIDIA_API_KEY,
-	NVIDIA_SHOW_PAID,
-	OPENCODE_API_KEY,
+	getFireworksApiKey,
+	getFireworksShowPaid,
+	getModalApiKey,
+	getNvidiaApiKey,
+	getNvidiaShowPaid,
+	getOpencodeApiKey,
 } from "./config.ts";
 import { createLogger } from "./lib/logger.ts";
 import { logWarning } from "./lib/util.ts";
@@ -78,17 +78,16 @@ export interface ProviderDefinition {
 // Config value getters (dynamic lookup)
 // =============================================================================
 
-// Map config key names to their values
 const API_KEY_GETTERS: Record<string, () => string | undefined> = {
-	nvidia_api_key: () => NVIDIA_API_KEY,
-	fireworks_api_key: () => FIREWORKS_API_KEY,
-	opencode_api_key: () => OPENCODE_API_KEY,
-	modal_api_key: () => MODAL_API_KEY,
+	nvidia_api_key: getNvidiaApiKey,
+	fireworks_api_key: getFireworksApiKey,
+	opencode_api_key: getOpencodeApiKey,
+	modal_api_key: getModalApiKey,
 };
 
 const SHOW_PAID_GETTERS: Record<string, () => boolean> = {
-	NVIDIA_SHOW_PAID: () => NVIDIA_SHOW_PAID,
-	FIREWORKS_SHOW_PAID: () => FIREWORKS_SHOW_PAID,
+	NVIDIA_SHOW_PAID: getNvidiaShowPaid,
+	FIREWORKS_SHOW_PAID: getFireworksShowPaid,
 };
 
 // =============================================================================
@@ -99,7 +98,7 @@ const SHOW_PAID_GETTERS: Record<string, () => boolean> = {
  * Create a provider with minimal boilerplate.
  *
  * Handles:
- *   - API key check and env injection
+ *   - API key check
  *   - SHOW_PAID flag check (if applicable)
  *   - Model fetching with error handling
  *   - Provider registration with OpenAI-compatible API
@@ -119,12 +118,7 @@ export async function createProvider(
 	}
 	const apiKey = getApiKey();
 
-	// 2. Inject into process.env so Pi's apiKey lookup finds it
-	if (apiKey) {
-		process.env[def.apiKeyEnvVar] = apiKey;
-	}
-
-	// 3. Check key exists
+	// 2. Check key exists
 	if (!apiKey) {
 		_logger.warn(
 			`No API key found — set ${def.apiKeyEnvVar} or add ${def.apiKeyConfigKey} to ~/.pi/free.json`,
@@ -132,7 +126,7 @@ export async function createProvider(
 		return;
 	}
 
-	// 4. Check paid flag (if applicable)
+	// 3. Check paid flag (if applicable)
 	if (def.showPaidFlag) {
 		const getShowPaid = SHOW_PAID_GETTERS[def.showPaidFlag];
 		if (getShowPaid && !getShowPaid()) {
@@ -143,7 +137,7 @@ export async function createProvider(
 		}
 	}
 
-	// 5. Fetch models
+	// 4. Fetch models
 	let models: ProviderModelConfig[] = [];
 	try {
 		models = await def.fetchModels();
@@ -157,7 +151,7 @@ export async function createProvider(
 		return;
 	}
 
-	// 6. Build storage (free/all or single set)
+	// 5. Build storage (free/all or single set)
 	const stored: StoredModels = def.hasFreeTier
 		? {
 				free: models.filter((m) => (m.cost?.input ?? 0) === 0),
@@ -165,10 +159,10 @@ export async function createProvider(
 			}
 		: { free: models, all: models };
 
-	// 7. Register provider
+	// 6. Register provider (pass literal key so we don't mutate process.env)
 	pi.registerProvider(def.providerId, {
 		baseUrl: def.baseUrl,
-		apiKey: def.apiKeyEnvVar,
+		apiKey,
 		api: "openai-completions" as const,
 		headers: {
 			"User-Agent": "pi-free-providers",
@@ -177,11 +171,11 @@ export async function createProvider(
 		models: enhanceWithCI(models),
 	});
 
-	// 8. Setup boilerplate
+	// 7. Setup boilerplate
 	const config = {
 		providerId: def.providerId,
 		baseUrl: def.baseUrl,
-		apiKey: def.apiKeyEnvVar,
+		apiKey,
 	};
 
 	const reRegister = createReRegister(pi, config);
@@ -202,7 +196,7 @@ export async function createProvider(
 		stored,
 	);
 
-	// 9. Optional: before_provider_request hook
+	// 8. Optional: before_provider_request hook
 	if (def.beforeProviderRequest) {
 		const hook = def.beforeProviderRequest;
 		(pi.on as (event: string, handler: (e: unknown) => unknown) => void)(

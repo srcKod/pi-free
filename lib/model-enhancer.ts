@@ -4,7 +4,7 @@
  */
 
 import type { ProviderModelConfig } from "@mariozechner/pi-coding-agent";
-import { enhanceModelNameWithCodingIndex } from "../provider-failover/benchmark-lookup.js";
+import { enhanceModelNameWithCodingIndex } from "../provider-failover/benchmark-lookup.ts";
 
 /**
  * Enhance model names with Coding Index scores

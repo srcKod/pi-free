@@ -26,25 +26,22 @@ vi.mock("../provider-helper.ts", () => ({
 	enhanceWithCI: (models: unknown[]) => models,
 }));
 
-vi.mock("../index.ts", () => ({
+vi.mock("../lib/registry.ts", () => ({
 	registerWithGlobalToggle: vi.fn(),
 	isFreeModel: (m: { cost?: { input?: number } }) => (m.cost?.input ?? 0) === 0,
 }));
 
 vi.mock("../config.ts", () => ({
-	KILO_FREE_ONLY: false,
-	KILO_SHOW_PAID: false,
+	getKiloFreeOnly: vi.fn(() => false),
+	getKiloShowPaid: vi.fn(() => false),
 	PROVIDER_KILO: "kilo",
-	FREE_ONLY: false,
 }));
 
 vi.mock("../lib/util.ts", () => ({
 	logWarning: vi.fn(),
 }));
 
-import { setupProvider } from "../provider-helper.ts";
 import kiloProvider from "../providers/kilo/kilo.ts";
-import { fetchKiloModels } from "../providers/kilo/kilo-models.ts";
 
 describe("Kilo Provider", () => {
 	let mockPi: ExtensionAPI;
@@ -154,7 +151,7 @@ describe("Kilo Provider", () => {
 
 	describe("registerWithGlobalToggle integration", () => {
 		it("should call registerWithGlobalToggle with correct config", async () => {
-			const { registerWithGlobalToggle } = await import("../index.ts");
+			const { registerWithGlobalToggle } = await import("../lib/registry.ts");
 			mockFetchKiloModels.mockResolvedValue([]);
 
 			await kiloProvider(mockPi);

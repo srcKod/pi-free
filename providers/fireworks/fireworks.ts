@@ -13,15 +13,15 @@ import type {
 	ExtensionAPI,
 	ProviderModelConfig,
 } from "@mariozechner/pi-coding-agent";
-import { FIREWORKS_API_KEY, PROVIDER_FIREWORKS } from "../../config.ts";
-import { BASE_URL_FIREWORKS, DEFAULT_FETCH_TIMEOUT_MS } from "../../constants.ts";
-import { registerWithGlobalToggle } from "../../index.ts";
-import { createLogger } from "../../lib/logger.ts";
-import { fetchWithRetry } from "../../lib/util.ts";
+import { getFireworksApiKey, PROVIDER_FIREWORKS } from "../../config.ts";
 import {
-	createReRegister,
-	enhanceWithCI,
-} from "../../provider-helper.ts";
+	BASE_URL_FIREWORKS,
+	DEFAULT_FETCH_TIMEOUT_MS,
+} from "../../constants.ts";
+import { createLogger } from "../../lib/logger.ts";
+import { registerWithGlobalToggle } from "../../lib/registry.ts";
+import { fetchWithRetry } from "../../lib/util.ts";
+import { createReRegister, enhanceWithCI } from "../../provider-helper.ts";
 
 const _logger = createLogger("fireworks");
 
@@ -95,7 +95,7 @@ async function fetchFireworksModels(
 		`${BASE_URL_FIREWORKS}/models`,
 		{
 			headers: {
-				"Authorization": `Bearer ${apiKey}`,
+				Authorization: `Bearer ${apiKey}`,
 				"User-Agent": "pi-free-providers",
 			},
 		},
@@ -114,7 +114,7 @@ async function fetchFireworksModels(
 	_logger.info(`Fetched ${json.data?.length || 0} total models from Fireworks`);
 
 	// Filter to chat-capable models only
-	let chatModels = json.data?.filter((m) => m.supports_chat) ?? [];
+	const chatModels = json.data?.filter((m) => m.supports_chat) ?? [];
 
 	// Fireworks uses a credit system - we can't determine free vs paid from API
 	// For now, consider all models as "all" (paid/credit-based)
@@ -141,7 +141,10 @@ async function fetchFireworksModels(
 				cacheWrite: 0,
 			},
 			contextWindow: model.context_length ?? 32768,
-			maxTokens: Math.min(Math.floor((model.context_length ?? 32768) / 2), 8192),
+			maxTokens: Math.min(
+				Math.floor((model.context_length ?? 32768) / 2),
+				8192,
+			),
 		};
 	});
 }
@@ -151,16 +154,15 @@ async function fetchFireworksModels(
 // =============================================================================
 
 export default async function (pi: ExtensionAPI): Promise<void> {
-	if (!FIREWORKS_API_KEY) {
+	const apiKey = getFireworksApiKey();
+	if (!apiKey) {
 		_logger.info("No API key found — set FIREWORKS_API_KEY to enable");
 		return;
 	}
 
-	process.env.FIREWORKS_API_KEY = FIREWORKS_API_KEY;
-
 	try {
 		// Fireworks uses credit system - fetch once (no free/paid split)
-		const allModels = await fetchFireworksModels(FIREWORKS_API_KEY, false);
+		const allModels = await fetchFireworksModels(apiKey, false);
 
 		if (allModels.length === 0) {
 			_logger.warn("No chat-capable models found from Fireworks API");
@@ -171,7 +173,7 @@ export default async function (pi: ExtensionAPI): Promise<void> {
 		const reRegister = createReRegister(pi, {
 			providerId: PROVIDER_FIREWORKS,
 			baseUrl: BASE_URL_FIREWORKS,
-			apiKey: "FIREWORKS_API_KEY",
+			apiKey,
 		});
 
 		// Register with global toggle (empty free list since Fireworks is credit-based)
@@ -185,7 +187,7 @@ export default async function (pi: ExtensionAPI): Promise<void> {
 		// Register initial models
 		pi.registerProvider(PROVIDER_FIREWORKS, {
 			baseUrl: BASE_URL_FIREWORKS,
-			apiKey: "FIREWORKS_API_KEY",
+			apiKey,
 			api: "openai-completions" as const,
 			headers: {
 				"User-Agent": "pi-free-providers",

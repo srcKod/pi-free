@@ -352,14 +352,11 @@ export default async function cloudflareProvider(pi: ExtensionAPI) {
 		return;
 	}
 
-	// Also inject into process.env for pi's API key lookup
-	process.env.CLOUDFLARE_API_TOKEN = apiToken;
-
 	const models = getModels();
 
 	pi.registerProvider("cloudflare", {
 		baseUrl: `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1`,
-		apiKey: "CLOUDFLARE_API_TOKEN",
+		apiKey: apiToken,
 		api: "openai-completions",
 		authHeader: true,
 		models,

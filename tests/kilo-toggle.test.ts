@@ -10,10 +10,9 @@ const mockRegisterWithGlobalToggle = vi.fn();
 let capturedToggleArgs: any[] = [];
 
 vi.mock("../config.ts", () => ({
-	KILO_FREE_ONLY: false,
-	KILO_SHOW_PAID: false,
+	getKiloFreeOnly: vi.fn(() => false),
+	getKiloShowPaid: vi.fn(() => false),
 	PROVIDER_KILO: "kilo",
-	FREE_ONLY: false,
 }));
 
 vi.mock("../providers/kilo/kilo-models.ts", () => ({
@@ -32,7 +31,7 @@ vi.mock("../provider-helper.ts", () => ({
 	createCtxReRegister: vi.fn(() => vi.fn()),
 }));
 
-vi.mock("../index.ts", () => ({
+vi.mock("../lib/registry.ts", () => ({
 	registerWithGlobalToggle: (...args: unknown[]) => {
 		capturedToggleArgs.push(args);
 		mockRegisterWithGlobalToggle(...args);

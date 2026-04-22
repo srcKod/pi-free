@@ -13,12 +13,15 @@
  * - Fireworks: Fireworks AI (paid, but useful for failover)
  */
 
-import type {
-	ExtensionAPI,
-	ProviderModelConfig,
-} from "@mariozechner/pi-coding-agent";
-import { FREE_ONLY, saveConfig } from "./config.ts";
+import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { createLogger } from "./lib/logger.ts";
+import {
+	applyGlobalFilter,
+	getGlobalFreeOnly,
+	getProviderRegistry,
+	isFreeModel,
+	registerWithGlobalToggle,
+} from "./lib/registry.ts";
 // Import unique provider extensions (only providers NOT built into pi)
 import cline from "./providers/cline/cline.ts";
 import cloudflare from "./providers/cloudflare/cloudflare.ts";
@@ -32,118 +35,6 @@ import qwen from "./providers/qwen/qwen.ts";
 const _logger = createLogger("pi-free");
 
 // =============================================================================
-// Global Provider Registry (for global /free toggle)
-// =============================================================================
-
-interface ProviderEntry {
-	id: string;
-	stored: { free: ProviderModelConfig[]; all: ProviderModelConfig[] };
-	reRegister: (models: ProviderModelConfig[]) => void;
-	hasKey: boolean;
-}
-
-const providerRegistry = new Map<string, ProviderEntry>();
-let globalFreeOnly = FREE_ONLY;
-
-/** Register a provider with the global free/paid toggle system */
-export function registerWithGlobalToggle(
-	providerId: string,
-	stored: { free: ProviderModelConfig[]; all: ProviderModelConfig[] },
-	reRegister: (models: ProviderModelConfig[]) => void,
-	hasKey: boolean = false,
-): void {
-	providerRegistry.set(providerId, {
-		id: providerId,
-		stored,
-		reRegister,
-		hasKey,
-	});
-	_logger.info(
-		`[pi-free] Registered ${providerId} with global toggle (${stored.free.length} free, ${stored.all.length} total)`,
-	);
-}
-
-// Providers that expose actual per-model pricing via API
-const PRICING_EXPOSED_PROVIDERS = new Set([
-	"openrouter",
-	"opencode",
-	"kilo",
-	"cline",
-]);
-
-/**
- * Check if a model is free.
- *
- * For providers with pricing APIs: uses cost (input === 0 && output === 0)
- * For providers without pricing: ONLY uses name-based check (name includes "free")
- */
-export function isFreeModel(
-	model: ProviderModelConfig & { provider?: string },
-): boolean {
-	const provider = model.provider;
-	const hasPricing = provider && PRICING_EXPOSED_PROVIDERS.has(provider);
-
-	// For providers WITH pricing API: cost-based check
-	if (hasPricing) {
-		if ((model.cost?.input ?? 0) === 0 && (model.cost?.output ?? 0) === 0) {
-			return true;
-		}
-	}
-
-	// For providers WITHOUT pricing API: ONLY name-based check
-	if (model.name.toLowerCase().includes("free")) {
-		return true;
-	}
-
-	return false;
-}
-
-/** Get current global free-only state */
-export function getGlobalFreeOnly(): boolean {
-	return globalFreeOnly;
-}
-
-// =============================================================================
-// Apply Global Free/Paid Filter to All Providers
-// =============================================================================
-
-function applyGlobalFilter(_pi: ExtensionAPI, freeOnly: boolean): void {
-	globalFreeOnly = freeOnly;
-	saveConfig({ free_only: freeOnly });
-
-	for (const [providerId, entry] of providerRegistry) {
-		try {
-			if (freeOnly) {
-				// Show only free models
-				if (entry.stored.free.length > 0) {
-					entry.reRegister(entry.stored.free);
-					_logger.info(
-						`[pi-free] ${providerId}: filtered to ${entry.stored.free.length} free models`,
-					);
-				} else {
-					_logger.warn(`[pi-free] ${providerId}: no free models available`);
-				}
-			} else {
-				// Show all models (paid + free)
-				const allModels =
-					entry.stored.all.length > 0 ? entry.stored.all : entry.stored.free;
-				if (allModels.length > 0) {
-					entry.reRegister(allModels);
-					_logger.info(
-						`[pi-free] ${providerId}: showing all ${allModels.length} models`,
-					);
-				}
-			}
-		} catch (err) {
-			_logger.error(
-				`[pi-free] Failed to apply filter to ${providerId}`,
-				err instanceof Error ? { error: err.message } : { error: String(err) },
-			);
-		}
-	}
-}
-
-// =============================================================================
 // Global Commands
 // =============================================================================
 
@@ -153,6 +44,7 @@ function setupGlobalCommands(pi: ExtensionAPI) {
 		description: "Toggle free-only mode for ALL providers (on/off/status)",
 		handler: async (args, ctx) => {
 			const arg = args.trim().toLowerCase();
+			const registry = getProviderRegistry();
 
 			if (arg === "on" || arg === "true" || arg === "yes") {
 				applyGlobalFilter(pi, true);
@@ -169,7 +61,7 @@ function setupGlobalCommands(pi: ExtensionAPI) {
 			} else if (arg === "status" || arg === "" || !arg) {
 				const available = await ctx.modelRegistry.getAvailable();
 				const freeCount = available.filter(isFreeModel).length;
-				const status = globalFreeOnly ? "enabled" : "disabled";
+				const status = getGlobalFreeOnly() ? "enabled" : "disabled";
 
 				// Count by provider
 				const lines = [
@@ -177,7 +69,7 @@ function setupGlobalCommands(pi: ExtensionAPI) {
 					`${freeCount}/${available.length} models free`,
 					"",
 				];
-				for (const [id, entry] of providerRegistry) {
+				for (const [id, entry] of registry) {
 					const free = entry.stored.free.length;
 					const all = entry.stored.all.length || free;
 					lines.push(`${id}: ${free}/${all} free`);
@@ -195,6 +87,7 @@ function setupGlobalCommands(pi: ExtensionAPI) {
 		description: "Show free/paid model counts for all pi-free providers",
 		handler: async (_args, ctx) => {
 			const lines = ["📊 Pi-Free Providers:", ""];
+			const registry = getProviderRegistry();
 
 			// Providers known to not expose pricing via API (all models show as "free")
 			// OpenRouter and OpenCode expose actual pricing
@@ -206,10 +99,9 @@ function setupGlobalCommands(pi: ExtensionAPI) {
 				"cerebras",
 			]);
 			// Freemium providers - all models share a free tier quota
-			// Freemium providers - all models share a free tier quota
 			const freemiumProviders = new Set(["nvidia"]);
 
-			for (const [id, entry] of providerRegistry) {
+			for (const [id, entry] of registry) {
 				const free = entry.stored.free.length;
 				const all = entry.stored.all.length || free;
 				const indicator = entry.hasKey ? "🔑" : "🆓";
@@ -234,7 +126,7 @@ function setupGlobalCommands(pi: ExtensionAPI) {
 				}
 			}
 
-			if (providerRegistry.size === 0) {
+			if (registry.size === 0) {
 				lines.push("(No providers registered yet)");
 			}
 
@@ -248,6 +140,7 @@ function setupGlobalCommands(pi: ExtensionAPI) {
 // =============================================================================
 
 export default async function (pi: ExtensionAPI) {
+	const globalFreeOnly = getGlobalFreeOnly();
 	_logger.info(`[pi-free] Initializing (global free-only: ${globalFreeOnly})`);
 
 	// Setup global commands first
@@ -282,8 +175,15 @@ export default async function (pi: ExtensionAPI) {
 		await applyGlobalFilter(pi, true);
 	}
 
-	_logger.info(`[pi-free] Loaded with ${providerRegistry.size} providers`);
+	const registry = getProviderRegistry();
+	_logger.info(`[pi-free] Loaded with ${registry.size} providers`);
 }
 
-// Re-export for providers
-export { providerRegistry };
+// Re-export registry helpers so consumers don't need deep imports
+export {
+	applyGlobalFilter,
+	getGlobalFreeOnly,
+	getProviderRegistry,
+	isFreeModel,
+	registerWithGlobalToggle,
+};

@@ -18,13 +18,22 @@ import type {
 	ExtensionAPI,
 	ProviderModelConfig,
 } from "@mariozechner/pi-coding-agent";
-import { OPENROUTER_SHOW_PAID, saveConfig } from "../../config.ts";
+import {
+	getCerebrasApiKey,
+	getGroqApiKey,
+	getHfToken,
+	getMistralApiKey,
+	getOpenrouterApiKey,
+	getOpenrouterShowPaid,
+	getXaiApiKey,
+	saveConfig,
+} from "../../config.ts";
 import {
 	BASE_URL_OPENROUTER,
 	DEFAULT_FETCH_TIMEOUT_MS,
 } from "../../constants.ts";
-import { isFreeModel, registerWithGlobalToggle } from "../../index.ts";
 import { createLogger } from "../../lib/logger.ts";
+import { isFreeModel, registerWithGlobalToggle } from "../../lib/registry.ts";
 import { fetchWithRetry } from "../../lib/util.ts";
 import { fetchOpenRouterCompatibleModels } from "../model-fetcher.ts";
 
@@ -52,7 +61,7 @@ async function fetchOpenRouterModels(
 
 interface DynamicProviderConfig {
 	providerId: string;
-	apiKeyEnvVar: string;
+	getApiKey: () => string | undefined;
 	baseUrl: string;
 	api: "openai-completions" | "mistral-conversations" | "anthropic-messages";
 	fetchModels: (apiKey: string) => Promise<ProviderModelConfig[]>;
@@ -334,42 +343,42 @@ async function fetchHuggingFaceModels(
 const DYNAMIC_PROVIDERS: Omit<DynamicProviderConfig, "fetchModels">[] = [
 	{
 		providerId: "mistral",
-		apiKeyEnvVar: "MISTRAL_API_KEY",
+		getApiKey: getMistralApiKey,
 		baseUrl: "https://api.mistral.ai/v1",
 		api: "openai-completions",
 		defaultShowPaid: false,
 	},
 	{
 		providerId: "groq",
-		apiKeyEnvVar: "GROQ_API_KEY",
+		getApiKey: getGroqApiKey,
 		baseUrl: "https://api.groq.com/openai/v1",
 		api: "openai-completions",
 		defaultShowPaid: false,
 	},
 	{
 		providerId: "cerebras",
-		apiKeyEnvVar: "CEREBRAS_API_KEY",
+		getApiKey: getCerebrasApiKey,
 		baseUrl: "https://api.cerebras.ai/v1",
 		api: "openai-completions",
 		defaultShowPaid: false,
 	},
 	{
 		providerId: "xai",
-		apiKeyEnvVar: "XAI_API_KEY",
+		getApiKey: getXaiApiKey,
 		baseUrl: "https://api.x.ai/v1",
 		api: "openai-completions",
 		defaultShowPaid: false,
 	},
 	{
 		providerId: "huggingface",
-		apiKeyEnvVar: "HF_TOKEN",
+		getApiKey: getHfToken,
 		baseUrl: "https://api-inference.huggingface.co",
 		api: "openai-completions",
 		defaultShowPaid: false,
 	},
 	{
 		providerId: "openrouter",
-		apiKeyEnvVar: "OPENROUTER_API_KEY",
+		getApiKey: getOpenrouterApiKey,
 		baseUrl: BASE_URL_OPENROUTER,
 		api: "openai-completions",
 		defaultShowPaid: false,
@@ -393,11 +402,6 @@ const FETCH_FUNCTIONS: Record<
 // OpenRouter exposes actual pricing
 const TOGGLEABLE_PROVIDERS = new Set(["openrouter"]);
 
-// Map provider IDs to their config show_paid flags
-const PROVIDER_CONFIG_FLAGS: Record<string, boolean> = {
-	openrouter: OPENROUTER_SHOW_PAID,
-};
-
 // =============================================================================
 // Main Setup Function
 // =============================================================================
@@ -408,11 +412,11 @@ export async function setupDynamicBuiltInProviders(
 	_logger.info("[dynamic] Setting up dynamic built-in providers...");
 
 	for (const config of DYNAMIC_PROVIDERS) {
-		const apiKey = process.env[config.apiKeyEnvVar];
+		const apiKey = config.getApiKey();
 
 		if (!apiKey) {
 			_logger.info(
-				`[dynamic] Skipping ${config.providerId} - no ${config.apiKeyEnvVar} found`,
+				`[dynamic] Skipping ${config.providerId} - no API key configured`,
 			);
 			continue;
 		}
@@ -432,7 +436,7 @@ export async function setupDynamicBuiltInProviders(
 			const reRegister = (models: ProviderModelConfig[]) => {
 				pi.registerProvider(config.providerId, {
 					baseUrl: config.baseUrl,
-					apiKey: config.apiKeyEnvVar,
+					apiKey,
 					api: config.api,
 					models,
 				});
@@ -452,8 +456,7 @@ export async function setupDynamicBuiltInProviders(
 
 			// Register toggle command only for providers with pricing info
 			if (TOGGLEABLE_PROVIDERS.has(config.providerId)) {
-				const initialShowPaid =
-					PROVIDER_CONFIG_FLAGS[config.providerId] ?? false;
+				const initialShowPaid = getOpenrouterShowPaid();
 				setupProviderToggle(
 					pi,
 					config.providerId,
