@@ -17,9 +17,13 @@ import type {
 	ExtensionAPI,
 	ProviderModelConfig,
 } from "@mariozechner/pi-coding-agent";
-import { KILO_FREE_ONLY, KILO_SHOW_PAID, PROVIDER_KILO } from "../../config.ts";
+import {
+	getKiloFreeOnly,
+	getKiloShowPaid,
+	PROVIDER_KILO,
+} from "../../config.ts";
 import { URL_KILO_TOS } from "../../constants.ts";
-import { isFreeModel, registerWithGlobalToggle } from "../../index.ts";
+import { isFreeModel, registerWithGlobalToggle } from "../../lib/registry.ts";
 import { cleanModelName, logWarning } from "../../lib/util.ts";
 import {
 	createCtxReRegister,
@@ -61,9 +65,10 @@ export default async function (pi: ExtensionAPI) {
 	}
 
 	// State tracking
-	let showPaidModels = KILO_SHOW_PAID;
-	let currentModels =
-		KILO_SHOW_PAID && !KILO_FREE_ONLY ? allModels : freeModels;
+	const kiloShowPaid = getKiloShowPaid();
+	const kiloFreeOnly = getKiloFreeOnly();
+	let showPaidModels = kiloShowPaid;
+	let currentModels = kiloShowPaid && !kiloFreeOnly ? allModels : freeModels;
 
 	// Shared model storage for global toggle
 	const stored: StoredModels = { free: freeModels, all: allModels };
@@ -104,7 +109,7 @@ export default async function (pi: ExtensionAPI) {
 				registerWithGlobalToggle(PROVIDER_KILO, stored, globalReRegister, true);
 
 				// If paid mode is enabled, show all models
-				if (showPaidModels && !KILO_FREE_ONLY) {
+				if (showPaidModels && !kiloFreeOnly) {
 					currentModels = allModels;
 					globalReRegister(allModels);
 				}
@@ -116,7 +121,7 @@ export default async function (pi: ExtensionAPI) {
 		refreshToken: refreshKiloToken,
 		getApiKey: (cred: OAuthCredentials) => cred.access,
 		modifyModels: (models: Model<Api>[], _cred: OAuthCredentials) => {
-			if (!showPaidModels || KILO_FREE_ONLY || allModels.length === 0) {
+			if (!showPaidModels || kiloFreeOnly || allModels.length === 0) {
 				return models;
 			}
 			const template = models.find((m) => m.provider === PROVIDER_KILO);
@@ -219,7 +224,7 @@ export default async function (pi: ExtensionAPI) {
 				registerWithGlobalToggle(PROVIDER_KILO, stored, ctxReRegister, true);
 
 				// Apply current view mode
-				if (showPaidModels && !KILO_FREE_ONLY) {
+				if (showPaidModels && !getKiloFreeOnly()) {
 					ctxReRegister(allModels);
 				}
 			} catch (error) {

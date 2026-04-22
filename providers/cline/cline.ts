@@ -17,7 +17,7 @@
 import type { OAuthCredentials } from "@mariozechner/pi-ai";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { BASE_URL_CLINE, PROVIDER_CLINE } from "../../constants.ts";
-import { registerWithGlobalToggle } from "../../index.ts";
+import { registerWithGlobalToggle } from "../../lib/registry.ts";
 import { logWarning } from "../../lib/util.ts";
 import { enhanceWithCI } from "../../provider-helper.ts";
 import { loginCline, refreshClineToken } from "./cline-auth.ts";

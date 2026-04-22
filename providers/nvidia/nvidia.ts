@@ -19,8 +19,8 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import {
 	applyHidden,
-	NVIDIA_API_KEY,
-	NVIDIA_SHOW_PAID,
+	getNvidiaApiKey,
+	getNvidiaShowPaid,
 	PROVIDER_NVIDIA,
 } from "../../config.ts";
 import {
@@ -29,7 +29,7 @@ import {
 	NVIDIA_MIN_SIZE_B,
 	URL_MODELS_DEV,
 } from "../../constants.ts";
-import { registerWithGlobalToggle } from "../../index.ts";
+import { registerWithGlobalToggle } from "../../lib/registry.ts";
 import type { ModelsDevProvider } from "../../lib/types.ts";
 import { fetchWithRetry, isUsableModel } from "../../lib/util.ts";
 import { createReRegister, enhanceWithCI } from "../../provider-helper.ts";
@@ -123,23 +123,24 @@ export default async function (pi: ExtensionAPI) {
 
 	// Store both sets for global toggle
 	const stored = { free: freeModels, all: allModels };
-	const hasKey = !!(NVIDIA_API_KEY || process.env.NVIDIA_API_KEY);
+	const apiKey = getNvidiaApiKey();
+	const hasKey = !!(apiKey || process.env.NVIDIA_API_KEY);
 
 	// Create re-register function
 	const reRegister = createReRegister(pi, {
 		providerId: PROVIDER_NVIDIA,
 		baseUrl: BASE_URL_NVIDIA,
-		apiKey: NVIDIA_API_KEY || "NVIDIA_API_KEY",
+		apiKey: apiKey || "NVIDIA_API_KEY",
 	});
 
 	// Register with global toggle system
 	registerWithGlobalToggle(PROVIDER_NVIDIA, stored, reRegister, hasKey);
 
 	// Register initial models (global toggle will apply filter if needed)
-	const initialModels = NVIDIA_SHOW_PAID ? allModels : freeModels;
+	const initialModels = getNvidiaShowPaid() ? allModels : freeModels;
 	pi.registerProvider(PROVIDER_NVIDIA, {
 		baseUrl: BASE_URL_NVIDIA,
-		apiKey: NVIDIA_API_KEY || "NVIDIA_API_KEY",
+		apiKey: apiKey || "NVIDIA_API_KEY",
 		api: "openai-completions" as const,
 		headers: {
 			"User-Agent": "pi-free-providers",

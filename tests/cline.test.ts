@@ -11,7 +11,7 @@ vi.mock("../constants.ts", () => ({
 	PROVIDER_CLINE: "cline",
 }));
 
-vi.mock("../index.ts", () => ({
+vi.mock("../lib/registry.ts", () => ({
 	registerWithGlobalToggle: vi.fn(),
 	isFreeModel: (m: any) => (m.cost?.input ?? 0) === 0,
 	getGlobalFreeOnly: () => false,

@@ -5,19 +5,8 @@
  *   1. Environment variable
  *   2. ~/.pi/free.json
  *
- * Per-provider paid model flags:
- *   KILO_SHOW_PAID=true or kilo_show_paid: true
- *   NVIDIA_SHOW_PAID=true or nvidia_show_paid: true
- *   FIREWORKS_SHOW_PAID=true or fireworks_show_paid: true
- *   CLINE_SHOW_PAID=true or cline_show_paid: true
- *   QWEN_SHOW_PAID=true or qwen_show_paid: true
- *   MODAL_SHOW_PAID=true or modal_show_paid: true
- *
- * PI_FREE_KILO_FREE_ONLY=true — restrict Kilo to free models even after login.
- *
- * Global free-only mode (new in v2.0):
- *   PI_FREE_ONLY=true or free_only: true — applies to ALL providers
- *   Use /free command to toggle interactively
+ * All exported values are getter functions so that runtime changes
+ * (e.g. after /{provider}-toggle or /free) are visible immediately.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -35,31 +24,30 @@ import { createLogger } from "./lib/logger.ts";
 const _logger = createLogger("config");
 
 interface PiFreeConfig {
-	// API Keys
 	nvidia_api_key?: string;
 	cloudflare_api_token?: string;
 	cloudflare_account_id?: string;
 	ollama_api_key?: string;
 	fireworks_api_key?: string;
 	modal_api_key?: string;
-	opencode_api_key?: string; // Used by some providers
+	opencode_api_key?: string;
+	mistral_api_key?: string;
+	groq_api_key?: string;
+	cerebras_api_key?: string;
+	xai_api_key?: string;
+	hf_token?: string;
+	openrouter_api_key?: string;
 	kilo_free_only?: boolean;
 	hidden_models?: string[];
-
-	// Global free-only mode (v2.0+)
 	free_only?: boolean;
-
-	// Per-provider paid model flags
 	kilo_show_paid?: boolean;
 	nvidia_show_paid?: boolean;
 	cloudflare_show_paid?: boolean;
 	ollama_show_paid?: boolean;
 	fireworks_show_paid?: boolean;
 	cline_show_paid?: boolean;
-	/** @deprecated Qwen provider is deprecated */
 	qwen_show_paid?: boolean;
 	modal_show_paid?: boolean;
-	// Built-in pi providers
 	openrouter_show_paid?: boolean;
 	opencode_show_paid?: boolean;
 }
@@ -72,6 +60,12 @@ const CONFIG_TEMPLATE: PiFreeConfig = {
 	fireworks_api_key: "",
 	modal_api_key: "",
 	opencode_api_key: "",
+	mistral_api_key: "",
+	groq_api_key: "",
+	cerebras_api_key: "",
+	xai_api_key: "",
+	hf_token: "",
+	openrouter_api_key: "",
 	kilo_free_only: false,
 	hidden_models: [],
 	free_only: true,
@@ -81,10 +75,8 @@ const CONFIG_TEMPLATE: PiFreeConfig = {
 	ollama_show_paid: false,
 	fireworks_show_paid: false,
 	cline_show_paid: false,
-	/** @deprecated Qwen provider is deprecated */
 	qwen_show_paid: false,
 	modal_show_paid: false,
-	// Built-in pi providers - default to showing only free
 	openrouter_show_paid: false,
 	opencode_show_paid: false,
 };
@@ -96,7 +88,6 @@ function ensureConfigFile(): void {
 	try {
 		mkdirSync(PI_DIR, { recursive: true });
 		if (existsSync(CONFIG_PATH)) {
-			// Merge: add any new template keys without touching existing values
 			const existing = JSON.parse(
 				readFileSync(CONFIG_PATH, "utf8"),
 			) as PiFreeConfig;
@@ -123,7 +114,7 @@ function ensureConfigFile(): void {
 	}
 }
 
-function loadConfigFile(): PiFreeConfig {
+export function loadConfigFile(): PiFreeConfig {
 	try {
 		return JSON.parse(readFileSync(CONFIG_PATH, "utf8")) as PiFreeConfig;
 	} catch {
@@ -132,16 +123,13 @@ function loadConfigFile(): PiFreeConfig {
 }
 
 ensureConfigFile();
-const file = loadConfigFile();
 
 // Resolve each value: env var takes priority over config file.
-// Treat empty strings in the config file as unset.
 function resolve(envKey: string, fileVal?: string): string | undefined {
 	return process.env[envKey] || (fileVal?.trim() ? fileVal : undefined);
 }
 
 // Resolve boolean flag: env var takes priority, then config file.
-// If neither is set, defaults to false (free-only mode).
 function resolveBool(envKey: string, fileVal?: boolean): boolean {
 	const envValue = process.env[envKey];
 	if (envValue === "true") return true;
@@ -149,108 +137,145 @@ function resolveBool(envKey: string, fileVal?: boolean): boolean {
 	return fileVal === true;
 }
 
-// Per-provider paid model flags - default to false (free-only) if not set
-export const KILO_SHOW_PAID = resolveBool(
-	"KILO_SHOW_PAID",
-	file.kilo_show_paid,
-);
-export const NVIDIA_SHOW_PAID = resolveBool(
-	"NVIDIA_SHOW_PAID",
-	file.nvidia_show_paid,
-);
-export const FIREWORKS_SHOW_PAID = resolveBool(
-	"FIREWORKS_SHOW_PAID",
-	file.fireworks_show_paid,
-);
-export const CLINE_SHOW_PAID = resolveBool(
-	"CLINE_SHOW_PAID",
-	file.cline_show_paid,
-);
-/** @deprecated Qwen provider is deprecated. The 1,000 req/day free tier is no longer available. */
-export const QWEN_SHOW_PAID = resolveBool(
-	"QWEN_SHOW_PAID",
-	file.qwen_show_paid,
-);
-if (QWEN_SHOW_PAID) {
-	_logger.warn(
-		"QWEN_SHOW_PAID is set but Qwen provider is deprecated. The 1,000 req/day free tier is no longer available.",
+// =============================================================================
+// Per-provider paid-model flags (getters so toggles reflect immediately)
+// =============================================================================
+
+export function getKiloShowPaid(): boolean {
+	return resolveBool("KILO_SHOW_PAID", loadConfigFile().kilo_show_paid);
+}
+
+export function getNvidiaShowPaid(): boolean {
+	return resolveBool("NVIDIA_SHOW_PAID", loadConfigFile().nvidia_show_paid);
+}
+
+export function getFireworksShowPaid(): boolean {
+	return resolveBool(
+		"FIREWORKS_SHOW_PAID",
+		loadConfigFile().fireworks_show_paid,
 	);
 }
-export const MODAL_SHOW_PAID = resolveBool(
-	"MODAL_SHOW_PAID",
-	file.modal_show_paid,
-);
-export const OLLAMA_SHOW_PAID = resolveBool(
-	"OLLAMA_SHOW_PAID",
-	file.ollama_show_paid,
-);
-export const CLOUDFLARE_SHOW_PAID = resolveBool(
-	"CLOUDFLARE_SHOW_PAID",
-	file.cloudflare_show_paid,
-);
 
-// Built-in pi providers - per-provider free model filtering
-export const OPENROUTER_SHOW_PAID = resolveBool(
-	"OPENROUTER_SHOW_PAID",
-	file.openrouter_show_paid,
-);
-export const OPENCODE_SHOW_PAID = resolveBool(
-	"OPENCODE_SHOW_PAID",
-	file.opencode_show_paid,
-);
-
-// Global free-only mode (new in v2.0) - applies to ALL providers
-export const FREE_ONLY = resolveBool("PI_FREE_ONLY", file.free_only);
-
-export const KILO_FREE_ONLY = resolveBool(
-	"PI_FREE_KILO_FREE_ONLY",
-	file.kilo_free_only,
-);
-
-const HIDDEN: Set<string> = new Set(file.hidden_models ?? []);
-
-/** Removes any models whose id appears in hidden_models. */
-export function applyHidden<T extends { id: string }>(models: T[]): T[] {
-	if (HIDDEN.size === 0) return models;
-	return models.filter((m) => !HIDDEN.has(m.id));
+export function getClineShowPaid(): boolean {
+	return resolveBool("CLINE_SHOW_PAID", loadConfigFile().cline_show_paid);
 }
 
-// API Keys
-export const NVIDIA_API_KEY = resolve("NVIDIA_API_KEY", file.nvidia_api_key);
-export const FIREWORKS_API_KEY = resolve(
-	"FIREWORKS_API_KEY",
-	file.fireworks_api_key,
-);
-export const MODAL_API_KEY = resolve("MODAL_API_KEY", file.modal_api_key);
-export const OLLAMA_API_KEY = resolve("OLLAMA_API_KEY", file.ollama_api_key);
-export const CLOUDFLARE_API_TOKEN = resolve(
-	"CLOUDFLARE_API_TOKEN",
-	file.cloudflare_api_token,
-);
-export const CLOUDFLARE_ACCOUNT_ID = resolve(
-	"CLOUDFLARE_ACCOUNT_ID",
-	file.cloudflare_account_id,
-);
-export const OPENCODE_API_KEY = resolve(
-	"OPENCODE_API_KEY",
-	file.opencode_api_key,
-);
+/** @deprecated Qwen provider is deprecated. */
+export function getQwenShowPaid(): boolean {
+	return resolveBool("QWEN_SHOW_PAID", loadConfigFile().qwen_show_paid);
+}
 
-// Re-export provider names for consistency
-export {
-	PROVIDER_CLINE,
-	PROVIDER_FIREWORKS,
-	PROVIDER_KILO,
-	PROVIDER_MODAL,
-	PROVIDER_NVIDIA,
-	PROVIDER_QWEN,
-};
+export function getModalShowPaid(): boolean {
+	return resolveBool("MODAL_SHOW_PAID", loadConfigFile().modal_show_paid);
+}
+
+export function getOllamaShowPaid(): boolean {
+	return resolveBool("OLLAMA_SHOW_PAID", loadConfigFile().ollama_show_paid);
+}
+
+export function getCloudflareShowPaid(): boolean {
+	return resolveBool(
+		"CLOUDFLARE_SHOW_PAID",
+		loadConfigFile().cloudflare_show_paid,
+	);
+}
+
+export function getOpenrouterShowPaid(): boolean {
+	return resolveBool(
+		"OPENROUTER_SHOW_PAID",
+		loadConfigFile().openrouter_show_paid,
+	);
+}
+
+export function getOpencodeShowPaid(): boolean {
+	return resolveBool("OPENCODE_SHOW_PAID", loadConfigFile().opencode_show_paid);
+}
 
 // =============================================================================
-// Config Persistence
+// Global free-only mode
 // =============================================================================
 
-/** Save updated config values to ~/.pi/free.json */
+export function getFreeOnly(): boolean {
+	return resolveBool("PI_FREE_ONLY", loadConfigFile().free_only);
+}
+
+export function getKiloFreeOnly(): boolean {
+	return resolveBool("PI_FREE_KILO_FREE_ONLY", loadConfigFile().kilo_free_only);
+}
+
+// =============================================================================
+// API Keys (getters so runtime config changes are visible)
+// =============================================================================
+
+export function getNvidiaApiKey(): string | undefined {
+	return resolve("NVIDIA_API_KEY", loadConfigFile().nvidia_api_key);
+}
+
+export function getFireworksApiKey(): string | undefined {
+	return resolve("FIREWORKS_API_KEY", loadConfigFile().fireworks_api_key);
+}
+
+export function getModalApiKey(): string | undefined {
+	return resolve("MODAL_API_KEY", loadConfigFile().modal_api_key);
+}
+
+export function getOllamaApiKey(): string | undefined {
+	return resolve("OLLAMA_API_KEY", loadConfigFile().ollama_api_key);
+}
+
+export function getCloudflareApiToken(): string | undefined {
+	return resolve("CLOUDFLARE_API_TOKEN", loadConfigFile().cloudflare_api_token);
+}
+
+export function getCloudflareAccountId(): string | undefined {
+	return resolve(
+		"CLOUDFLARE_ACCOUNT_ID",
+		loadConfigFile().cloudflare_account_id,
+	);
+}
+
+export function getOpencodeApiKey(): string | undefined {
+	return resolve("OPENCODE_API_KEY", loadConfigFile().opencode_api_key);
+}
+
+export function getMistralApiKey(): string | undefined {
+	return resolve("MISTRAL_API_KEY", loadConfigFile().mistral_api_key);
+}
+
+export function getGroqApiKey(): string | undefined {
+	return resolve("GROQ_API_KEY", loadConfigFile().groq_api_key);
+}
+
+export function getCerebrasApiKey(): string | undefined {
+	return resolve("CEREBRAS_API_KEY", loadConfigFile().cerebras_api_key);
+}
+
+export function getXaiApiKey(): string | undefined {
+	return resolve("XAI_API_KEY", loadConfigFile().xai_api_key);
+}
+
+export function getHfToken(): string | undefined {
+	return resolve("HF_TOKEN", loadConfigFile().hf_token);
+}
+
+export function getOpenrouterApiKey(): string | undefined {
+	return resolve("OPENROUTER_API_KEY", loadConfigFile().openrouter_api_key);
+}
+
+// =============================================================================
+// Hidden models (re-reads config on every call)
+// =============================================================================
+
+export function applyHidden<T extends { id: string }>(models: T[]): T[] {
+	const hidden = new Set(loadConfigFile().hidden_models ?? []);
+	if (hidden.size === 0) return models;
+	return models.filter((m) => !hidden.has(m.id));
+}
+
+// =============================================================================
+// Persistence
+// =============================================================================
+
 export function saveConfig(updates: Partial<PiFreeConfig>): void {
 	try {
 		const existing = loadConfigFile();
@@ -268,7 +293,19 @@ export function saveConfig(updates: Partial<PiFreeConfig>): void {
 	}
 }
 
-/** Get current config values (for checking state) */
 export function getConfig(): PiFreeConfig {
 	return loadConfigFile();
 }
+
+// =============================================================================
+// Re-export provider names for consistency
+// =============================================================================
+
+export {
+	PROVIDER_CLINE,
+	PROVIDER_FIREWORKS,
+	PROVIDER_KILO,
+	PROVIDER_MODAL,
+	PROVIDER_NVIDIA,
+	PROVIDER_QWEN,
+};

@@ -13,8 +13,7 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import { saveConfig } from "./config.ts";
 import { createLogger } from "./lib/logger.ts";
-import type { AutoSwitchConfig } from "./provider-failover/auto-switch.ts";
-import { enhanceModelNameWithCodingIndex } from "./provider-failover/benchmark-lookup.js";
+import { enhanceModelNameWithCodingIndex } from "./provider-failover/benchmark-lookup.ts";
 
 const _logger = createLogger("provider-helper");
 
@@ -43,8 +42,6 @@ export interface ProviderSetupConfig {
 			ui: { notify: (m: string, t: "info" | "warning" | "error") => void };
 		},
 	) => Promise<boolean>;
-	/** Auto-switch configuration for failover. If enabled, will automatically switch providers on rate limits. */
-	autoSwitch?: Partial<AutoSwitchConfig>;
 	/** When true, skips creating the /{provider}-toggle command. Useful for providers with only one model. */
 	skipToggle?: boolean;
 }

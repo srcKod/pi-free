@@ -46,8 +46,8 @@ const mockFireworksModelsResponse = {
 
 // Mock dependencies
 vi.mock("../config.ts", () => ({
-	FIREWORKS_API_KEY: "test-fireworks-key",
-	FIREWORKS_SHOW_PAID: true,
+	getFireworksApiKey: vi.fn(() => "test-fireworks-key"),
+	getFireworksShowPaid: vi.fn(() => true),
 	PROVIDER_FIREWORKS: "fireworks",
 	applyHidden: (models: unknown[]) => models,
 }));
@@ -57,7 +57,7 @@ vi.mock("../constants.ts", () => ({
 	DEFAULT_FETCH_TIMEOUT_MS: 10000,
 }));
 
-vi.mock("../index.ts", () => ({
+vi.mock("../lib/registry.ts", () => ({
 	registerWithGlobalToggle: vi.fn(),
 	isFreeModel: (m: any) => (m.cost?.input ?? 0) === 0,
 	getGlobalFreeOnly: () => false,
@@ -116,33 +116,16 @@ describe("Fireworks Provider", () => {
 				"fireworks",
 				expect.objectContaining({
 					baseUrl: "https://api.fireworks.ai/inference/v1",
-					apiKey: "FIREWORKS_API_KEY",
+					apiKey: "test-fireworks-key",
 					api: "openai-completions",
 					models: expect.any(Array),
 				}),
 			);
 		});
 
-		it("should set API key in environment", async () => {
-			delete process.env.FIREWORKS_API_KEY;
-			mockFetchWithRetry.mockResolvedValue({
-				ok: true,
-				json: () => Promise.resolve(mockFireworksModelsResponse),
-			});
-
-			const { default: fireworksProvider } = await import(
-				"../providers/fireworks/fireworks.ts"
-			);
-			await fireworksProvider(mockPi);
-
-			expect(process.env.FIREWORKS_API_KEY).toBe("test-fireworks-key");
-		});
-
 		it("should skip registration without API key", async () => {
-			// Mock no API key
-			const apiKeySpy = vi
-				.spyOn(await import("../config.ts"), "FIREWORKS_API_KEY", "get")
-				.mockReturnValue(undefined as any);
+			const { getFireworksApiKey } = await import("../config.ts");
+			vi.mocked(getFireworksApiKey).mockReturnValueOnce(undefined);
 
 			const { default: fireworksProvider } = await import(
 				"../providers/fireworks/fireworks.ts"
@@ -150,7 +133,6 @@ describe("Fireworks Provider", () => {
 			await fireworksProvider(mockPi);
 
 			expect(mockRegisterProvider).not.toHaveBeenCalled();
-			apiKeySpy.mockRestore();
 		});
 	});
 
@@ -251,7 +233,7 @@ describe("Fireworks Provider", () => {
 			mockFetchWithRetry.mockRejectedValue(new Error("API Error"));
 
 			const { default: fireworksProvider } = await import(
-				"../providers/fireworks/fireworks.ts?t=" + Date.now()
+				"../providers/fireworks/fireworks.ts"
 			);
 
 			// Should not throw

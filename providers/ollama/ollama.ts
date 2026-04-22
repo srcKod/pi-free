@@ -24,14 +24,18 @@ import type {
 	ExtensionAPI,
 	ProviderModelConfig,
 } from "@mariozechner/pi-coding-agent";
-import { applyHidden, OLLAMA_API_KEY, OLLAMA_SHOW_PAID } from "../../config.ts";
+import {
+	applyHidden,
+	getOllamaApiKey,
+	getOllamaShowPaid,
+} from "../../config.ts";
 import {
 	BASE_URL_OLLAMA,
 	DEFAULT_FETCH_TIMEOUT_MS,
 	PROVIDER_OLLAMA,
 } from "../../constants.ts";
-import { registerWithGlobalToggle } from "../../index.ts";
 import { createLogger } from "../../lib/logger.ts";
+import { registerWithGlobalToggle } from "../../lib/registry.ts";
 import { fetchWithRetry } from "../../lib/util.ts";
 import { createReRegister, enhanceWithCI } from "../../provider-helper.ts";
 
@@ -159,7 +163,7 @@ function parseContextWindow(paramSize?: string): number {
 // =============================================================================
 
 export default async function (pi: ExtensionAPI) {
-	const apiKey = OLLAMA_API_KEY;
+	const apiKey = getOllamaApiKey();
 
 	if (!apiKey) {
 		_logger.info(
@@ -167,9 +171,6 @@ export default async function (pi: ExtensionAPI) {
 		);
 		return;
 	}
-
-	// Inject into process.env so Pi's apiKey lookup finds it
-	process.env.OLLAMA_API_KEY = apiKey;
 
 	// Fetch models
 	let allModels: ProviderModelConfig[] = [];
@@ -193,17 +194,17 @@ export default async function (pi: ExtensionAPI) {
 	const reRegister = createReRegister(pi, {
 		providerId: PROVIDER_OLLAMA,
 		baseUrl: BASE_URL_OLLAMA,
-		apiKey: "OLLAMA_API_KEY",
+		apiKey,
 	});
 
 	// Register with global toggle system
 	registerWithGlobalToggle(PROVIDER_OLLAMA, stored, reRegister, hasKey);
 
 	// Register initial models
-	const initialModels = OLLAMA_SHOW_PAID ? allModels : freeModels;
+	const initialModels = getOllamaShowPaid() ? allModels : freeModels;
 	pi.registerProvider(PROVIDER_OLLAMA, {
 		baseUrl: BASE_URL_OLLAMA,
-		apiKey: "OLLAMA_API_KEY",
+		apiKey,
 		api: "openai-completions" as const,
 		models: enhanceWithCI(initialModels),
 	});

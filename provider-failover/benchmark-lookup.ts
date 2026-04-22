@@ -10,7 +10,7 @@
 import {
 	HARDCODED_BENCHMARKS,
 	type HardcodedBenchmark,
-} from "./hardcoded-benchmarks.js";
+} from "./hardcoded-benchmarks.ts";
 
 // Re-export the type and data so callers can migrate imports here
 export { HARDCODED_BENCHMARKS, type HardcodedBenchmark };
@@ -46,7 +46,8 @@ function isVariantQualifier(segment: string): boolean {
 	// Date codes like "0528", "20250514"
 	if (/^\d{4,8}$/.test(segment)) return true;
 	// Month names (from date suffixes like "may-25", "mar-24")
-	if (/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)$/.test(segment)) return true;
+	if (/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)$/.test(segment))
+		return true;
 	// Size specifiers like "70b", "8b", "a35b", "a3b" (MoE notation)
 	if (/^a?\d+(\.\d+)?b$/i.test(segment)) return true;
 	// Version numbers like "v3.2", "v2.5", "v1"
@@ -54,7 +55,8 @@ function isVariantQualifier(segment: string): boolean {
 	// Two-digit year like "25", "24"
 	if (/^\d{2}$/.test(segment)) return true;
 	// Special variant suffixes
-	if (segment === "speciale" || segment === "chatgpt" || segment === "latest") return true;
+	if (segment === "speciale" || segment === "chatgpt" || segment === "latest")
+		return true;
 	return false;
 }
 
@@ -95,7 +97,10 @@ function findBestVariantByPrefix(baseId: string): HardcodedBenchmark | null {
 	const prefixKey = baseId + "-";
 	const candidates: { key: string; data: HardcodedBenchmark }[] = [];
 
-	for (const [key, data] of Object.entries(HARDCODED_BENCHMARKS) as [string, HardcodedBenchmark][]) {
+	for (const [key, data] of Object.entries(HARDCODED_BENCHMARKS) as [
+		string,
+		HardcodedBenchmark,
+	][]) {
 		// Exact match
 		if (key === baseId) {
 			if (data.codingIndex !== undefined) return data;
@@ -144,7 +149,10 @@ export function findHardcodedBenchmark(
 	const search = `${modelName} ${modelId}`.toLowerCase();
 
 	// 1. Direct lookup — check if any benchmark key is a substring of the search
-	for (const [key, data] of Object.entries(HARDCODED_BENCHMARKS) as [string, HardcodedBenchmark][]) {
+	for (const [key, data] of Object.entries(HARDCODED_BENCHMARKS) as [
+		string,
+		HardcodedBenchmark,
+	][]) {
 		if (search.includes(key.toLowerCase())) {
 			return data;
 		}
@@ -160,11 +168,19 @@ export function findHardcodedBenchmark(
 			"sonnet-3.5",
 		],
 		"claude-3-opus": ["claude-3-opus", "opus-3"],
-		"llama-3.1-instruct-405b": ["llama-3.1-405b", "llama3.1-405b", "llama-405b"],
+		"llama-3.1-instruct-405b": [
+			"llama-3.1-405b",
+			"llama3.1-405b",
+			"llama-405b",
+		],
 		"llama-3.1-instruct-70b": ["llama-3.1-70b", "llama3.1-70b", "llama-70b"],
 		"gemini-1.5-pro": ["gemini-1.5-pro", "gemini1.5-pro", "gemini-pro-1.5"],
 		"qwen2.5-instruct-72b": ["qwen2.5-72b", "qwen-2.5-72b"],
-		"deepseek-v3.2-non-reasoning": ["deepseek-v3", "deepseekv3", "deepseek-chat"],
+		"deepseek-v3.2-non-reasoning": [
+			"deepseek-v3",
+			"deepseekv3",
+			"deepseek-chat",
+		],
 		"mimo-v2-pro": ["mimo-v2-pro", "mimo-v2-pro-free", "mimo-pro"],
 		"mimo-v2-omni": ["mimo-v2-omni", "mimo-v2-omni-free", "mimo-omni"],
 		"mimo-v2-flash": ["mimo-v2-flash", "mimo-v2-flash-free", "mimo-flash"],
