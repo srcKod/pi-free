@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Ollama Cloud API endpoint** — Fixed broken Ollama Cloud integration:
+  - Changed `BASE_URL_OLLAMA` from `https://ollama.com` to `https://ollama.com/v1` — the OpenAI-compatible API endpoint
+  - Fixed model fetching to use `/v1/models` instead of `/api/tags` — ensures model IDs work with chat completions endpoint
+  - Previously calls went to HTML homepage instead of API endpoints, causing 404 errors
+
+### Removed
+- **Removed paid model warning on selection** — Deleted the `model_select` event handler that showed:
+  - `⚠️ Paid model selected (${model.id}). Use "/free off" to enable paid models.`
+  - This warning was redundant since the global `/free` toggle and provider toggles already control model visibility
+
+- **Removed pointless `/modal-toggle` command** — Modal provider only has 1 free model (GLM-5.1 FP8), so there was nothing meaningful to toggle:
+  - Added `skipToggle` option to `ProviderDefinition` and `ProviderSetupConfig` interfaces
+  - Modal provider now sets `skipToggle: true` to prevent toggle command creation
+
+### Changed
+- **Marked Qwen provider as fully deprecated** — Updated messaging to clarify the provider is broken:
+  - Changed model name from `"Qwen Coder — Free 1k/day"` to `"Qwen Coder — DEPRECATED (free tier discontinued)"`
+  - Updated all JSDoc comments to clearly state auth is broken and free tier is no longer available
+  - Provider remains for backward compatibility but should not be used
+
 ### Added
 - **Cloudflare Workers AI provider** — New provider for Cloudflare's serverless GPU platform:
   - 50+ open-source models: Llama 4, Mistral Small 3.1, Qwen 2.5/3, DeepSeek R1, Gemma 4, Kimi K2.5/2.6, and more

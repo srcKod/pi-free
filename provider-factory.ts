@@ -62,6 +62,8 @@ export interface ProviderDefinition {
 	tosUrl?: string;
 	/** Whether this provider has a free tier (free + paid models). Default: false */
 	hasFreeTier?: boolean;
+	/** Whether to skip creating a toggle command (e.g., for single-model providers). Default: false */
+	skipToggle?: boolean;
 	/** Additional headers to include in requests */
 	extraHeaders?: Record<string, string>;
 	/** Optional hook to modify request payload before sending */
@@ -195,6 +197,7 @@ export async function createProvider(
 				stored.all = m;
 				reRegister(m);
 			},
+			skipToggle: def.skipToggle,
 		},
 		stored,
 	);

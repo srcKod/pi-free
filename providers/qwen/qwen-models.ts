@@ -1,7 +1,8 @@
 /**
  * Qwen OAuth model definitions.
  *
- * Free tier provides Qwen Coder Plus with 1,000 requests/day.
+ * @deprecated The 1,000 req/day free tier is no longer available. Auth is broken.
+ * This provider remains for backward compatibility but should not be used.
  */
 
 import type { ProviderModelConfig } from "@mariozechner/pi-coding-agent";
@@ -31,7 +32,7 @@ export const PORTAL_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
 export const QWEN_FREE_MODELS: ProviderModelConfig[] = [
 	{
 		id: "coder-model",
-		name: "Qwen Coder — Free 1k/day",
+		name: "Qwen Coder — DEPRECATED (free tier discontinued)",
 		reasoning: false,
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -42,10 +43,11 @@ export const QWEN_FREE_MODELS: ProviderModelConfig[] = [
 ];
 
 /**
- * Fetch Qwen models. For OAuth free tier, the model list is static.
+ * Fetch Qwen models. Returns static model list for backward compatibility.
+ * @deprecated Qwen free tier is discontinued.
  */
 export async function fetchQwenModels(): Promise<ProviderModelConfig[]> {
-	_logger.info("Qwen OAuth: using static free tier models");
+	_logger.info("Qwen provider is deprecated, returning placeholder models");
 	return QWEN_FREE_MODELS;
 }
 
@@ -74,9 +76,13 @@ export async function fetchQwenLiveModels(
 			return templateModels;
 		}
 
-		interface ModelEntry { id: string }
+		interface ModelEntry {
+			id: string;
+		}
 		const data = (await response.json()) as { data?: ModelEntry[] };
-		const ids: string[] = (data.data ?? []).map((m: ModelEntry) => m.id).filter(Boolean);
+		const ids: string[] = (data.data ?? [])
+			.map((m: ModelEntry) => m.id)
+			.filter(Boolean);
 
 		_logger.info("Qwen live models discovered", { ids });
 

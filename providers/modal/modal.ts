@@ -35,6 +35,7 @@ export default function (pi: Parameters<typeof createProvider>[0]) {
 		apiKeyConfigKey: "modal_api_key",
 		fetchModels: async () => getModalModels(),
 		tosUrl: URL_MODAL_TOS,
+		skipToggle: true, // Modal only has 1 model, no need for toggle
 		extraHeaders: {
 			"X-Title": "Pi",
 			"HTTP-Referer": "https://modal.com/",
