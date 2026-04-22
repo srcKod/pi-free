@@ -68,8 +68,10 @@ interface OllamaTagsResponse {
 async function fetchOllamaModels(
 	apiKey: string,
 ): Promise<ProviderModelConfig[]> {
+	// Use OpenAI-compatible /v1/models endpoint for consistency
+	// The native /api/tags returns :cloud suffixes that may not work with /v1/chat/completions
 	const response = await fetchWithRetry(
-		`${BASE_URL_OLLAMA}/api/tags`,
+		`${BASE_URL_OLLAMA}/v1/models`,
 		{
 			headers: {
 				Authorization: `Bearer ${apiKey}`,
@@ -87,17 +89,17 @@ async function fetchOllamaModels(
 		);
 	}
 
-	const json = (await response.json()) as OllamaTagsResponse;
-	const models = json.models ?? [];
+	const json = (await response.json()) as {
+		data?: Array<{ id: string; owned_by?: string }>;
+	};
+	const models = json.data ?? [];
 
 	_logger.info(`[ollama] Fetched ${models.length} models from Ollama Cloud`);
 
 	// Filter to chat/text generation models only
 	const chatModels = models.filter((m) => {
-		// Ollama models don't have explicit capabilities, but we can infer
-		// Most models in ollama library are text generation models
 		// Skip embedding-only models (typically have "embed" in name)
-		const name = m.name.toLowerCase();
+		const name = m.id.toLowerCase();
 		if (name.includes("embed")) return false;
 		return true;
 	});
@@ -105,15 +107,13 @@ async function fetchOllamaModels(
 	const result = applyHidden(
 		chatModels.map(
 			(m): ProviderModelConfig => ({
-				id: m.name,
-				name: m.name,
-				// Try to infer reasoning from model name/family
+				id: m.id,
+				name: m.id,
+				// Try to infer reasoning from model name
 				reasoning:
-					m.name.toLowerCase().includes("reasoning") ||
-					m.name.toLowerCase().includes("r1") ||
-					!!m.details?.families?.some((f) =>
-						f.toLowerCase().includes("reasoning"),
-					),
+					m.id.toLowerCase().includes("reasoning") ||
+					m.id.toLowerCase().includes("r1") ||
+					m.id.toLowerCase().includes("thinking"),
 				input: ["text"],
 				// Ollama Cloud uses usage-based pricing (GPU time), not per-token
 				// Free tier has limits but no direct cost per token
@@ -123,8 +123,8 @@ async function fetchOllamaModels(
 					cacheRead: 0,
 					cacheWrite: 0,
 				},
-				// Extract context window from parameter size if available
-				contextWindow: parseContextWindow(m.details?.parameter_size),
+				// Default context window - Ollama doesn't expose this via /v1/models
+				contextWindow: 32768,
 				maxTokens: 4096, // Default, varies by model
 			}),
 		),

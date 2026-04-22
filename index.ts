@@ -241,21 +241,6 @@ function setupGlobalCommands(pi: ExtensionAPI) {
 			ctx.ui.notify(lines.join("\n"), "info");
 		},
 	});
-
-	// Notify when paid models are selected in free-only mode
-	pi.on("model_select", async (event, ctx) => {
-		const model = event.model;
-		if (!model || !globalFreeOnly) return;
-		if (isFreeModel(model)) return;
-
-		// Only warn for providers managed by pi-free
-		if (providerRegistry.has(model.provider)) {
-			ctx.ui.notify(
-				`⚠️ Paid model selected (${model.id}). Use "/free off" to enable paid models.`,
-				"warning",
-			);
-		}
-	});
 }
 
 // =============================================================================

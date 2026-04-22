@@ -13,8 +13,8 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import { saveConfig } from "./config.ts";
 import { createLogger } from "./lib/logger.ts";
-import { enhanceModelNameWithCodingIndex } from "./provider-failover/benchmark-lookup.js";
 import type { AutoSwitchConfig } from "./provider-failover/auto-switch.ts";
+import { enhanceModelNameWithCodingIndex } from "./provider-failover/benchmark-lookup.js";
 
 const _logger = createLogger("provider-helper");
 
@@ -45,6 +45,8 @@ export interface ProviderSetupConfig {
 	) => Promise<boolean>;
 	/** Auto-switch configuration for failover. If enabled, will automatically switch providers on rate limits. */
 	autoSwitch?: Partial<AutoSwitchConfig>;
+	/** When true, skips creating the /{provider}-toggle command. Useful for providers with only one model. */
+	skipToggle?: boolean;
 }
 
 export interface StoredModels {
@@ -174,42 +176,44 @@ export function setupProvider(
 		config.reRegister(enhanced, _s);
 	};
 
-	// ── Single toggle command ──────────────────────────────────────────
+	// ── Single toggle command (skip if requested) ──────────────────────
 
-	pi.registerCommand(`${providerId}-toggle`, {
-		description: `Toggle between free and all ${providerId} models`,
-		handler: async (_args, ctx) => {
-			// Toggle the mode
-			currentShowPaid = !currentShowPaid;
+	if (!config.skipToggle) {
+		pi.registerCommand(`${providerId}-toggle`, {
+			description: `Toggle between free and all ${providerId} models`,
+			handler: async (_args, ctx) => {
+				// Toggle the mode
+				currentShowPaid = !currentShowPaid;
 
-			// Persist to config file
-			const configKey = getShowPaidConfigKey(providerId);
-			saveConfig({ [configKey]: currentShowPaid });
+				// Persist to config file
+				const configKey = getShowPaidConfigKey(providerId);
+				saveConfig({ [configKey]: currentShowPaid });
 
-			// Re-register with appropriate model set
-			if (currentShowPaid) {
-				if (stored.all.length === 0) {
-					ctx.ui.notify("No models available", "warning");
-					return;
+				// Re-register with appropriate model set
+				if (currentShowPaid) {
+					if (stored.all.length === 0) {
+						ctx.ui.notify("No models available", "warning");
+						return;
+					}
+					reRegister(stored.all, stored);
+					ctx.ui.notify(
+						`${providerId}: showing all ${stored.all.length} models (including paid)`,
+						"info",
+					);
+				} else {
+					if (stored.free.length === 0) {
+						ctx.ui.notify("No free models loaded", "warning");
+						return;
+					}
+					reRegister(stored.free, stored);
+					ctx.ui.notify(
+						`${providerId}: showing ${stored.free.length} free models`,
+						"info",
+					);
 				}
-				reRegister(stored.all, stored);
-				ctx.ui.notify(
-					`${providerId}: showing all ${stored.all.length} models (including paid)`,
-					"info",
-				);
-			} else {
-				if (stored.free.length === 0) {
-					ctx.ui.notify("No free models loaded", "warning");
-					return;
-				}
-				reRegister(stored.free, stored);
-				ctx.ui.notify(
-					`${providerId}: showing ${stored.free.length} free models`,
-					"info",
-				);
-			}
-		},
-	});
+			},
+		});
+	}
 
 	// ── Clear status when another provider is selected ───────────────────
 
