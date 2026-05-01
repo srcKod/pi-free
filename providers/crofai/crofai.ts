@@ -26,13 +26,13 @@ import {
 	PROVIDER_CROFAI,
 } from "../../constants.ts";
 import { createLogger } from "../../lib/logger.ts";
+import {
+	getProxyModelCompat,
+	isLikelyReasoningModel,
+} from "../../lib/provider-compat.ts";
 import { isFreeModel, registerWithGlobalToggle } from "../../lib/registry.ts";
 import { fetchWithRetry } from "../../lib/util.ts";
-import {
-	createReRegister,
-	enhanceWithCI,
-	setupProvider,
-} from "../../provider-helper.ts";
+import { createReRegister, setupProvider } from "../../provider-helper.ts";
 
 const _logger = createLogger("crofai");
 
@@ -77,11 +77,12 @@ async function fetchCrofaiModels(
 
 		return models
 			.filter((m) => m.id) // Filter out any empty entries
-			.map(
-				(m): ProviderModelConfig => ({
+			.map((m) => {
+				const name = m.id.split("/").pop() || m.id;
+				return {
 					id: m.id,
-					name: m.id.split("/").pop() || m.id, // Use last part of ID as name
-					reasoning: m.id.includes("reasoning") || m.id.includes("think"),
+					name,
+					reasoning: isLikelyReasoningModel({ id: m.id, name }),
 					input: ["text"],
 					cost: {
 						input: 0, // CrofAI doesn't expose pricing via API
@@ -91,13 +92,13 @@ async function fetchCrofaiModels(
 					},
 					contextWindow: 128000, // Default, varies by model
 					maxTokens: 4096,
-				}),
-			);
+					compat: getProxyModelCompat({ id: m.id, name }),
+				} satisfies ProviderModelConfig;
+			});
 	} catch (error) {
-		_logger.error(
-			"[crofai] Failed to fetch models:",
-			{ error: error instanceof Error ? error.message : String(error) },
-		);
+		_logger.error("[crofai] Failed to fetch models:", {
+			error: error instanceof Error ? error.message : String(error),
+		});
 		return [];
 	}
 }
