@@ -9,8 +9,7 @@
  * - Cline: Cline bot integration
  * - NVIDIA: NVIDIA NIM hosting (free tier available)
  * - Ollama Cloud: Ollama's cloud-hosted models with usage-based free tier
- * - Qwen: OAuth-based Qwen access (deprecated)
- * - Modal: Modal Labs hosting
+ * - ZenMux: Unified AI API gateway with 200+ models
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
@@ -25,12 +24,11 @@ import {
 } from "./lib/registry.ts";
 // Import unique provider extensions (only providers NOT built into pi)
 import cline from "./providers/cline/cline.ts";
-import cloudflare from "./providers/cloudflare/cloudflare.ts";
+import crofai from "./providers/crofai/crofai.ts";
 import kilo from "./providers/kilo/kilo.ts";
-import modal from "./providers/modal/modal.ts";
 import nvidia from "./providers/nvidia/nvidia.ts";
 import ollama from "./providers/ollama/ollama.ts";
-import qwen from "./providers/qwen/qwen.ts";
+import zenmux from "./providers/zenmux/zenmux.ts";
 
 const _logger = createLogger("pi-free");
 
@@ -106,17 +104,15 @@ export default async function (pi: ExtensionAPI) {
 	// Load all unique providers
 	// Each provider will register itself with the global toggle system
 	await Promise.allSettled([
-		cloudflare(pi),
-		modal(pi),
 		nvidia(pi),
 		kilo(pi),
 		ollama(pi),
-		// Qwen is deprecated
-		qwen(pi),
 		cline(pi),
+		zenmux(pi),
+		crofai(pi),
 	]);
 
-	// Setup dynamic built-in providers (Mistral, Groq, Cerebras, xAI, Hugging Face, OpenRouter)
+	// Setup dynamic built-in providers (Mistral, Groq, Cerebras, xAI, Hugging Face)
 	// These only activate if the user has configured API keys (OpenRouter works without key too)
 	const { setupDynamicBuiltInProviders } = await import(
 		"./providers/dynamic-built-in/index.ts"

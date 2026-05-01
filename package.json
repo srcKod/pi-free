@@ -2,18 +2,19 @@
 	"name": "pi-free",
 	"version": "2.0.2",
 	"type": "module",
-	"description": "AIO free models for PI: Kilo, Cline, Nvidia, Ollama Cloud and others",
+	"description": "AI model providers for Pi with free model filtering. Shows only $0 cost models by default. Supports Kilo (free OAuth), Cline (free), NVIDIA (freemium), ZenMux, CrofAI, Ollama Cloud, and more.",
 	"keywords": [
 		"pi-package",
 		"pi-extension",
 		"free-models",
+		"paid-models",
 		"model-filter",
 		"nvidia-nim",
 		"kilo",
 		"cline",
-		"qwen",
-		"qwen-oauth",
-		"modal"
+		"zenmux",
+		"crofai",
+		"ollama-cloud"
 	],
 	"license": "MIT",
 	"author": "Apostolos Mantzaris",

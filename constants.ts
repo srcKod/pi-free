@@ -15,6 +15,8 @@ export const PROVIDER_OLLAMA = "ollama-cloud";
 /** @deprecated Qwen provider is deprecated. The 1,000 req/day free tier is no longer available. */
 export const PROVIDER_QWEN = "qwen";
 export const PROVIDER_MODAL = "modal";
+export const PROVIDER_ZENMUX = "zenmux";
+export const PROVIDER_CROFAI = "crofai";
 
 export const ALL_UNIQUE_PROVIDERS = [
 	PROVIDER_KILO,
@@ -24,6 +26,8 @@ export const ALL_UNIQUE_PROVIDERS = [
 	PROVIDER_QWEN,
 	PROVIDER_MODAL,
 	PROVIDER_OLLAMA,
+	PROVIDER_ZENMUX,
+	PROVIDER_CROFAI,
 ] as const;
 
 // =============================================================================
@@ -38,6 +42,8 @@ export const BASE_URL_CLINE = "https://api.cline.bot/api/v1";
 export const BASE_URL_MODAL = "https://api.us-west-2.modal.direct/v1";
 export const BASE_URL_QWEN =
 	"https://dashscope.aliyuncs.com/compatible-mode/v1";
+export const BASE_URL_ZENMUX = "https://zenmux.ai/api/v1";
+export const BASE_URL_CROFAI = "https://crof.ai/v1";
 
 /** Cline fetches free models from OpenRouter */
 export const BASE_URL_OPENROUTER = "https://openrouter.ai/api/v1";
