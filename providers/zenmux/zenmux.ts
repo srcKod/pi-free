@@ -27,13 +27,13 @@ import {
 	PROVIDER_ZENMUX,
 } from "../../constants.ts";
 import { createLogger } from "../../lib/logger.ts";
+import {
+	getProxyModelCompat,
+	isLikelyReasoningModel,
+} from "../../lib/provider-compat.ts";
 import { isFreeModel, registerWithGlobalToggle } from "../../lib/registry.ts";
 import { fetchWithRetry } from "../../lib/util.ts";
-import {
-	createReRegister,
-	enhanceWithCI,
-	setupProvider,
-} from "../../provider-helper.ts";
+import { createReRegister, setupProvider } from "../../provider-helper.ts";
 
 const _logger = createLogger("zenmux");
 
@@ -49,6 +49,11 @@ interface ZenMuxModel {
 		prompt?: number;
 		completion?: number;
 	};
+}
+
+function isZenmuxReasoningModel(model: Pick<ZenMuxModel, "id" | "name">) {
+	const haystack = `${model.id} ${model.name ?? ""}`.toLowerCase();
+	return isLikelyReasoningModel(model) || haystack.includes("claude");
 }
 
 async function fetchZenmuxModels(
@@ -83,7 +88,7 @@ async function fetchZenmuxModels(
 			(m): ProviderModelConfig => ({
 				id: m.id,
 				name: m.name || m.id,
-				reasoning: m.id.includes("claude") || m.id.includes("thinking"),
+				reasoning: isZenmuxReasoningModel(m),
 				input: ["text"],
 				cost: {
 					input: m.pricing?.prompt || 0,
@@ -93,13 +98,13 @@ async function fetchZenmuxModels(
 				},
 				contextWindow: m.context_length || 128000,
 				maxTokens: m.context_length ? Math.floor(m.context_length / 2) : 4096,
+				compat: getProxyModelCompat(m),
 			}),
 		);
 	} catch (error) {
-		_logger.error(
-			"[zenmux] Failed to fetch models:",
-			{ error: error instanceof Error ? error.message : String(error) },
-		);
+		_logger.error("[zenmux] Failed to fetch models:", {
+			error: error instanceof Error ? error.message : String(error),
+		});
 		return [];
 	}
 }
