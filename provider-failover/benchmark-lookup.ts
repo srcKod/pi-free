@@ -78,7 +78,7 @@ function logDebug(entry: {
 			entry.codingIndex !== undefined ? entry.codingIndex.toFixed(1) : "",
 			entry.details || "",
 		]
-			.map((f) => f.replace(/\|/g, "\\|")) // Escape pipes
+			.map((f) => f.replace(/[\\|]/g, "\\$&")) // Escape backslashes and pipes
 			.join("|");
 
 		appendFileSync(LOG_FILE, `${line}\n`);

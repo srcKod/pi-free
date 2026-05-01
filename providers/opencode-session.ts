@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 /**
  * Shared OpenCode session/request tracking.
  *
@@ -9,10 +11,7 @@ export function createOpenCodeSessionTracker() {
 	let requestCount = 0;
 
 	function generateId(): string {
-		return (
-			Math.random().toString(36).substring(2, 15) +
-			Math.random().toString(36).substring(2, 15)
-		);
+		return randomUUID().replace(/-/g, "");
 	}
 
 	function getSessionId(): string {
