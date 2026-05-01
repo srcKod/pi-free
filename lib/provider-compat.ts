@@ -10,7 +10,8 @@ export const DEEPSEEK_PROXY_COMPAT: NonNullable<ProviderModelConfig["compat"]> =
 		supportsStore: false,
 		supportsDeveloperRole: false,
 		supportsReasoningEffort: true,
-		thinkingFormat: "openai",
+		requiresReasoningContentOnAssistantMessages: true,
+		thinkingFormat: "deepseek",
 	};
 
 export function isDeepSeekModel(model: ProviderModelIdentity): boolean {
