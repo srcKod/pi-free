@@ -25,7 +25,7 @@ export function openBrowser(url: string): void {
 					"-NoProfile",
 					"-NonInteractive",
 					"-Command",
-					`Start-Process "${url.replace(/"/g, '\\"')}"`,
+					`Start-Process "${url.replace(/[\\"]/g, "\\$&")}"`,
 				],
 				{ detached: true, shell: false, windowsHide: true },
 			).unref();

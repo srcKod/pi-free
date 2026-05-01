@@ -112,7 +112,7 @@ export async function createProvider(
 	// 1. Get API key from config
 	const getApiKey = API_KEY_GETTERS[def.apiKeyConfigKey];
 	if (!getApiKey) {
-		_logger.error(`Unknown API key config: ${def.apiKeyConfigKey}`);
+		_logger.error(`Unknown config key for ${def.providerId}`);
 		return;
 	}
 	const apiKey = getApiKey();
@@ -120,7 +120,7 @@ export async function createProvider(
 	// 2. Check key exists
 	if (!apiKey) {
 		_logger.warn(
-			`No API key found — set ${def.apiKeyEnvVar} or add ${def.apiKeyConfigKey} to ~/.pi/free.json`,
+			`No API key for ${def.providerId} — check README for setup instructions`,
 		);
 		return;
 	}
