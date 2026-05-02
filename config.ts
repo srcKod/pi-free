@@ -32,7 +32,6 @@ interface PiFreeConfig {
 	cerebras_api_key?: string;
 	xai_api_key?: string;
 	hf_token?: string;
-	openrouter_api_key?: string;
 	kilo_free_only?: boolean;
 	hidden_models?: string[];
 	free_only?: boolean;
@@ -55,7 +54,7 @@ const CONFIG_TEMPLATE: PiFreeConfig = {
 	cerebras_api_key: "",
 	xai_api_key: "",
 	hf_token: "",
-	openrouter_api_key: "",
+
 	kilo_free_only: false,
 	hidden_models: [],
 	free_only: true,
@@ -215,8 +214,12 @@ export function getHfToken(): string | undefined {
 	return resolve("HF_TOKEN", loadConfigFile().hf_token);
 }
 
+/**
+ * OpenRouter key — pi's built-in provider reads from ~/.pi/agent/auth.json.
+ * pi-free only checks the env var to avoid stale keys from free.json.
+ */
 export function getOpenrouterApiKey(): string | undefined {
-	return resolve("OPENROUTER_API_KEY", loadConfigFile().openrouter_api_key);
+	return process.env.OPENROUTER_API_KEY;
 }
 
 // =============================================================================
