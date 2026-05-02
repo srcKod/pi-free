@@ -370,24 +370,46 @@ function findBestVariantByPrefix(
 }
 
 // =============================================================================
-// Main lookup
+// Variant alias mappings
 // =============================================================================
 
-export function findHardcodedBenchmark(
-	modelName: string,
+const MODEL_VARIANTS: Record<string, string[]> = {
+	"gpt-4o-aug-24": ["gpt-4o", "gpt-4-o"],
+	"gpt-4": ["gpt-4", "gpt4"],
+	"claude-3.5-sonnet-oct-24": [
+		"claude-3.5-sonnet",
+		"claude-3-5-sonnet",
+		"sonnet-3.5",
+	],
+	"claude-3-opus": ["claude-3-opus", "opus-3"],
+	"llama-3.1-instruct-405b": ["llama-3.1-405b", "llama3.1-405b", "llama-405b"],
+	"llama-3.1-instruct-70b": ["llama-3.1-70b", "llama3.1-70b", "llama-70b"],
+	"gemini-1.5-pro": ["gemini-1.5-pro", "gemini1.5-pro", "gemini-pro-1.5"],
+	"qwen2.5-instruct-72b": ["qwen2.5-72b", "qwen-2.5-72b"],
+	"deepseek-v3.2-non-reasoning": ["deepseek-v3", "deepseekv3", "deepseek-chat"],
+	"mimo-v2-pro": ["mimo-v2-pro", "mimo-v2-pro-free", "mimo-pro"],
+	"mimo-v2-omni": ["mimo-v2-omni", "mimo-v2-omni-free", "mimo-omni"],
+	"mimo-v2-flash": ["mimo-v2-flash", "mimo-v2-flash-free", "mimo-flash"],
+	"big-pickle": ["big-pickle", "bigpickle"],
+	"minimax-m2.5": ["minimax-m2.5", "minimax-m2.5-free", "minimax-m25"],
+	"nvidia-nemotron-3-super-120b-a12b-reasoning": [
+		"nemotron-3-super",
+		"nemotron-3-super-free",
+		"nemotron-super",
+		"nemotron-3",
+	],
+};
+
+// =============================================================================
+// Strategy steps
+// =============================================================================
+
+function tryDirectSubstringMatch(
+	search: string,
+	provider: string | undefined,
 	modelId: string,
-	provider?: string,
+	modelName: string,
 ): HardcodedBenchmark | null {
-	const search = `${modelName} ${modelId}`.toLowerCase();
-
-	logDebug({
-		provider,
-		modelId,
-		modelName,
-		action: "attempt",
-	});
-
-	// 1. Direct lookup — check if any benchmark key is a substring of the search
 	for (const [key, data] of Object.entries(HARDCODED_BENCHMARKS) as [
 		string,
 		HardcodedBenchmark,
@@ -405,44 +427,16 @@ export function findHardcodedBenchmark(
 			return data;
 		}
 	}
+	return null;
+}
 
-	// 2. Variant matching — aliases for models with different naming conventions
-	const variants: Record<string, string[]> = {
-		"gpt-4o-aug-24": ["gpt-4o", "gpt-4-o"],
-		"gpt-4": ["gpt-4", "gpt4"],
-		"claude-3.5-sonnet-oct-24": [
-			"claude-3.5-sonnet",
-			"claude-3-5-sonnet",
-			"sonnet-3.5",
-		],
-		"claude-3-opus": ["claude-3-opus", "opus-3"],
-		"llama-3.1-instruct-405b": [
-			"llama-3.1-405b",
-			"llama3.1-405b",
-			"llama-405b",
-		],
-		"llama-3.1-instruct-70b": ["llama-3.1-70b", "llama3.1-70b", "llama-70b"],
-		"gemini-1.5-pro": ["gemini-1.5-pro", "gemini1.5-pro", "gemini-pro-1.5"],
-		"qwen2.5-instruct-72b": ["qwen2.5-72b", "qwen-2.5-72b"],
-		"deepseek-v3.2-non-reasoning": [
-			"deepseek-v3",
-			"deepseekv3",
-			"deepseek-chat",
-		],
-		"mimo-v2-pro": ["mimo-v2-pro", "mimo-v2-pro-free", "mimo-pro"],
-		"mimo-v2-omni": ["mimo-v2-omni", "mimo-v2-omni-free", "mimo-omni"],
-		"mimo-v2-flash": ["mimo-v2-flash", "mimo-v2-flash-free", "mimo-flash"],
-		"big-pickle": ["big-pickle", "bigpickle"],
-		"minimax-m2.5": ["minimax-m2.5", "minimax-m2.5-free", "minimax-m25"],
-		"nvidia-nemotron-3-super-120b-a12b-reasoning": [
-			"nemotron-3-super",
-			"nemotron-3-super-free",
-			"nemotron-super",
-			"nemotron-3",
-		],
-	};
-
-	for (const [canonical, names] of Object.entries(variants)) {
+function tryVariantAliasMatch(
+	search: string,
+	provider: string | undefined,
+	modelId: string,
+	modelName: string,
+): HardcodedBenchmark | null {
+	for (const [canonical, names] of Object.entries(MODEL_VARIANTS)) {
 		if (names.some((n) => search.includes(n.toLowerCase()))) {
 			const data = HARDCODED_BENCHMARKS[canonical];
 			if (data) {
@@ -459,65 +453,114 @@ export function findHardcodedBenchmark(
 			}
 		}
 	}
+	return null;
+}
 
-	// 3. Provider-specific normalization
-	const { normalized: providerNormalized, strategy: providerStrategy } =
-		applyProviderNormalization(modelId, provider);
+function tryProviderNormalizedMatch(
+	modelId: string,
+	provider: string | undefined,
+	modelName: string,
+): { result: HardcodedBenchmark | null; normalized: string } {
+	const { normalized, strategy } = applyProviderNormalization(
+		modelId,
+		provider,
+	);
 
-	if (providerNormalized !== modelId.toLowerCase()) {
-		logDebug({
-			provider,
-			modelId,
-			modelName,
-			action: "normalized",
-			strategy: providerStrategy,
-			normalizedId: providerNormalized,
-		});
-
-		// Try exact match on normalized ID
-		for (const [key, data] of Object.entries(HARDCODED_BENCHMARKS) as [
-			string,
-			HardcodedBenchmark,
-		][]) {
-			if (providerNormalized.includes(key.toLowerCase())) {
-				logDebug({
-					provider,
-					modelId,
-					modelName,
-					action: "match",
-					strategy: `provider-normalized:${providerStrategy}`,
-					matchKey: key,
-					codingIndex: data.codingIndex,
-				});
-				return data;
-			}
-		}
+	if (normalized === modelId.toLowerCase()) {
+		return { result: null, normalized };
 	}
 
-	// 4. Prefix fallback — extract base model ID and find best variant
-	//    Handles cases where benchmark keys have variant suffixes
-	//    (reasoning/non-reasoning, effort levels, dates) that the model ID lacks
-	const baseId = extractBaseModelId(providerNormalized);
-	if (baseId) {
-		let best = findBestVariantByPrefix(baseId, provider, modelId);
-		if (best) return best;
+	logDebug({
+		provider,
+		modelId,
+		modelName,
+		action: "normalized",
+		strategy,
+		normalizedId: normalized,
+	});
 
-		// 4b. Try with word-order normalization
-		//     (e.g., llama-3.3-70b-instruct → llama-3.3-instruct-70b)
-		const normalizedId = normalizeSizeTokenOrder(baseId);
-		if (normalizedId !== baseId) {
+	for (const [key, data] of Object.entries(HARDCODED_BENCHMARKS) as [
+		string,
+		HardcodedBenchmark,
+	][]) {
+		if (normalized.includes(key.toLowerCase())) {
 			logDebug({
 				provider,
 				modelId,
 				modelName,
-				action: "normalized",
-				strategy: "size-token-reorder",
-				normalizedId: normalizedId,
+				action: "match",
+				strategy: `provider-normalized:${strategy}`,
+				matchKey: key,
+				codingIndex: data.codingIndex,
 			});
-			best = findBestVariantByPrefix(normalizedId, provider, modelId);
-			if (best) return best;
+			return { result: data, normalized };
 		}
 	}
+
+	return { result: null, normalized };
+}
+
+function tryPrefixFallback(
+	normalizedId: string,
+	provider: string | undefined,
+	modelId: string,
+	modelName: string,
+): HardcodedBenchmark | null {
+	const baseId = extractBaseModelId(normalizedId);
+	if (!baseId) return null;
+
+	const best = findBestVariantByPrefix(baseId, provider, modelId);
+	if (best) return best;
+
+	// Try with word-order normalization
+	// (e.g., llama-3.3-70b-instruct → llama-3.3-instruct-70b)
+	const reordered = normalizeSizeTokenOrder(baseId);
+	if (reordered === baseId) return null;
+
+	logDebug({
+		provider,
+		modelId,
+		modelName,
+		action: "normalized",
+		strategy: "size-token-reorder",
+		normalizedId: reordered,
+	});
+
+	return findBestVariantByPrefix(reordered, provider, modelId);
+}
+
+// =============================================================================
+// Main lookup
+// =============================================================================
+
+export function findHardcodedBenchmark(
+	modelName: string,
+	modelId: string,
+	provider?: string,
+): HardcodedBenchmark | null {
+	const search = `${modelName} ${modelId}`.toLowerCase();
+
+	logDebug({ provider, modelId, modelName, action: "attempt" });
+
+	// 1. Direct substring match
+	const direct = tryDirectSubstringMatch(search, provider, modelId, modelName);
+	if (direct) return direct;
+
+	// 2. Variant alias matching
+	const variant = tryVariantAliasMatch(search, provider, modelId, modelName);
+	if (variant) return variant;
+
+	// 3. Provider-specific normalization
+	const { result: normalizedResult, normalized } = tryProviderNormalizedMatch(
+		modelId,
+		provider,
+		modelName,
+	);
+	if (normalizedResult) return normalizedResult;
+
+	// 4. Prefix fallback with base model extraction
+	const prefix = tryPrefixFallback(normalized, provider, modelId, modelName);
+	if (prefix) return prefix;
 
 	// No match found
 	logDebug({
@@ -526,8 +569,8 @@ export function findHardcodedBenchmark(
 		modelName,
 		action: "miss",
 		strategy: "all-strategies-failed",
-		normalizedId: baseId || providerNormalized,
-		details: `Final normalized: ${baseId || providerNormalized}`,
+		normalizedId: normalized,
+		details: `Final normalized: ${normalized}`,
 	});
 
 	return null;
@@ -569,6 +612,45 @@ export function enhanceModelNameWithCodingIndex(
  * Get statistics about model matching from the current session
  * Note: This reads the log file and computes stats
  */
+interface LogStats {
+	totalAttempts: number;
+	matches: number;
+	misses: number;
+	byProvider: Record<
+		string,
+		{ attempts: number; matches: number; misses: number }
+	>;
+}
+
+function parseLogLine(stats: LogStats, line: string): void {
+	if (!line.trim()) return;
+	const parts = line.split("|");
+	if (parts.length < 5) return;
+
+	const provider = parts[1] || "unknown";
+	const action = parts[4];
+
+	if (!stats.byProvider[provider]) {
+		stats.byProvider[provider] = { attempts: 0, matches: 0, misses: 0 };
+	}
+
+	if (action === "attempt") {
+		stats.totalAttempts++;
+		stats.byProvider[provider].attempts++;
+	} else if (action === "match") {
+		stats.matches++;
+		stats.byProvider[provider].matches++;
+	} else if (action === "miss") {
+		stats.misses++;
+		stats.byProvider[provider].misses++;
+	}
+}
+
+function computeMatchRate(stats: LogStats): number {
+	const total = stats.matches + stats.misses;
+	return total > 0 ? Math.round((stats.matches / total) * 100) : 0;
+}
+
 export function getMatchingStats(): {
 	totalAttempts: number;
 	matches: number;
@@ -579,58 +661,27 @@ export function getMatchingStats(): {
 		{ attempts: number; matches: number; misses: number }
 	>;
 } {
-	const stats = {
+	const stats: LogStats = {
 		totalAttempts: 0,
 		matches: 0,
 		misses: 0,
-		matchRate: 0,
-		byProvider: {} as Record<
-			string,
-			{ attempts: number; matches: number; misses: number }
-		>,
+		byProvider: {},
 	};
 
 	try {
 		if (!existsSync(LOG_FILE)) {
-			return stats;
+			return { ...stats, matchRate: 0 };
 		}
 
 		const content = readFileSync(LOG_FILE, "utf-8");
-		const lines = content.split("\n").slice(1); // Skip header
-
-		for (const line of lines) {
-			if (!line.trim()) continue;
-			const parts = line.split("|");
-			if (parts.length < 5) continue;
-
-			const provider = parts[1] || "unknown";
-			const action = parts[4];
-
-			if (!stats.byProvider[provider]) {
-				stats.byProvider[provider] = { attempts: 0, matches: 0, misses: 0 };
-			}
-
-			if (action === "attempt") {
-				stats.totalAttempts++;
-				stats.byProvider[provider].attempts++;
-			} else if (action === "match") {
-				stats.matches++;
-				stats.byProvider[provider].matches++;
-			} else if (action === "miss") {
-				stats.misses++;
-				stats.byProvider[provider].misses++;
-			}
+		for (const line of content.split("\n").slice(1)) {
+			parseLogLine(stats, line);
 		}
-
-		stats.matchRate =
-			stats.totalAttempts > 0
-				? Math.round((stats.matches / (stats.matches + stats.misses)) * 100)
-				: 0;
 	} catch {
 		// Return empty stats on error
 	}
 
-	return stats;
+	return { ...stats, matchRate: computeMatchRate(stats) };
 }
 
 // Need to import readFileSync for stats

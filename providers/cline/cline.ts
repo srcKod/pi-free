@@ -138,19 +138,24 @@ function extractTaskBody(content: unknown): string {
 	return "";
 }
 
-function shapeMessagesForCline(messages: any[]): any[] {
-	let lastWrappedIdx = -1;
-	let baseTranscript = "";
+function findLastClineWrappedMessage(messages: any[]): {
+	index: number;
+	transcript: string;
+} {
 	for (let i = messages.length - 1; i >= 0; i--) {
 		if (messages[i]?.role !== "user") continue;
 		if (!isClineWrapped(messages[i]?.content)) continue;
-		lastWrappedIdx = i;
-		baseTranscript = extractTaskBody(messages[i].content);
-		break;
+		return { index: i, transcript: extractTaskBody(messages[i].content) };
 	}
+	return { index: -1, transcript: "" };
+}
 
+function buildTranscriptParts(
+	messages: any[],
+	startIdx: number,
+	baseTranscript: string,
+): string[] {
 	const parts: string[] = baseTranscript ? [baseTranscript] : [];
-	const startIdx = lastWrappedIdx >= 0 ? lastWrappedIdx + 1 : 0;
 
 	for (let i = startIdx; i < messages.length; i++) {
 		const msg = messages[i];
@@ -167,9 +172,10 @@ function shapeMessagesForCline(messages: any[]): any[] {
 		}
 	}
 
-	const transcript = parts.join("\n\n").trim() || "(no conversation yet)";
-	const envDetails = buildEnvironmentDetails();
+	return parts;
+}
 
+function buildCollapsedMessage(messages: any[], transcript: string): any[] {
 	const collapsed: any[] = [];
 	const systemMsg = messages.find((m: any) => m?.role === "system");
 	if (systemMsg) {
@@ -182,11 +188,22 @@ function shapeMessagesForCline(messages: any[]): any[] {
 		content: [
 			{ type: "text", text: `<task>\n${transcript}\n</task>` },
 			{ type: "text", text: TASK_PROGRESS_BLOCK },
-			{ type: "text", text: envDetails },
+			{ type: "text", text: buildEnvironmentDetails() },
 		],
 	});
 
 	return collapsed;
+}
+
+function shapeMessagesForCline(messages: any[]): any[] {
+	const { index: lastWrappedIdx, transcript: baseTranscript } =
+		findLastClineWrappedMessage(messages);
+
+	const startIdx = lastWrappedIdx >= 0 ? lastWrappedIdx + 1 : 0;
+	const parts = buildTranscriptParts(messages, startIdx, baseTranscript);
+	const transcript = parts.join("\n\n").trim() || "(no conversation yet)";
+
+	return buildCollapsedMessage(messages, transcript);
 }
 
 // =============================================================================

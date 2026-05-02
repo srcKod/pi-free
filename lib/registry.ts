@@ -156,33 +156,40 @@ export function getProviderRegistry(): ReadonlyMap<string, ProviderEntry> {
 // Global filter application
 // =============================================================================
 
+function applyFilterToProvider(
+	providerId: string,
+	entry: ProviderEntry,
+	freeOnly: boolean,
+): void {
+	if (freeOnly) {
+		if (entry.stored.free.length > 0) {
+			entry.reRegister(entry.stored.free);
+			_logger.info(
+				`[pi-free] ${providerId}: filtered to ${entry.stored.free.length} free models`,
+			);
+		} else {
+			_logger.warn(`[pi-free] ${providerId}: no free models available`);
+		}
+	} else {
+		// Show all models (paid + free)
+		const allModels =
+			entry.stored.all.length > 0 ? entry.stored.all : entry.stored.free;
+		if (allModels.length > 0) {
+			entry.reRegister(allModels);
+			_logger.info(
+				`[pi-free] ${providerId}: showing all ${allModels.length} models`,
+			);
+		}
+	}
+}
+
 export function applyGlobalFilter(_pi: ExtensionAPI, freeOnly: boolean): void {
 	globalFreeOnly = freeOnly;
 	saveConfig({ free_only: freeOnly });
 
 	for (const [providerId, entry] of providerRegistry) {
 		try {
-			if (freeOnly) {
-				// Show only free models
-				if (entry.stored.free.length > 0) {
-					entry.reRegister(entry.stored.free);
-					_logger.info(
-						`[pi-free] ${providerId}: filtered to ${entry.stored.free.length} free models`,
-					);
-				} else {
-					_logger.warn(`[pi-free] ${providerId}: no free models available`);
-				}
-			} else {
-				// Show all models (paid + free)
-				const allModels =
-					entry.stored.all.length > 0 ? entry.stored.all : entry.stored.free;
-				if (allModels.length > 0) {
-					entry.reRegister(allModels);
-					_logger.info(
-						`[pi-free] ${providerId}: showing all ${allModels.length} models`,
-					);
-				}
-			}
+			applyFilterToProvider(providerId, entry, freeOnly);
 		} catch (err) {
 			_logger.error(
 				`[pi-free] Failed to apply filter to ${providerId}`,

@@ -158,7 +158,7 @@ export default async function (pi: ExtensionAPI) {
 	// Apply initial global filter if free-only mode is enabled
 	if (globalFreeOnly) {
 		_logger.info("[pi-free] Applying initial free-only filter");
-		await applyGlobalFilter(pi, true);
+		applyGlobalFilter(pi, true);
 	}
 
 	const registry = getProviderRegistry();
