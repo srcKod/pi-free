@@ -132,7 +132,7 @@ function extractTaskBody(content: unknown): string {
 	if (!Array.isArray(content)) return "";
 	for (const p of content as any[]) {
 		if (p?.type !== "text" || typeof p?.text !== "string") continue;
-		const m = p.text.match(/<task>\s*([\s\S]*?)\s*<\/task>/);
+		const m = p.text.match(/<task>([\s\S]*?)<\/task>/);
 		if (m?.[1]) return m[1].trim();
 	}
 	return "";
