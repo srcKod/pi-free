@@ -248,6 +248,29 @@ export default async function (pi: ExtensionAPI) {
 		},
 	});
 
+	// ── Status bar for provider selection ─────────────────────────
+
+	pi.on("model_select", (_event, ctx) => {
+		if (_event.model?.provider !== PROVIDER_CLINE) {
+			ctx.ui.setStatus(`${PROVIDER_CLINE}-status`, undefined);
+			return;
+		}
+
+		const free = stored.free.length;
+		const total = stored.all.length;
+		const paid = total - free;
+		const mode = toggleState.getCurrentMode();
+		let status: string;
+		if (paid === 0) {
+			status = `cline: ${free} free models`;
+		} else if (mode === "all") {
+			status = `cline: ${total} models (free + paid)`;
+		} else {
+			status = `cline: ${free} free \u00b7 ${paid} paid`;
+		}
+		ctx.ui.setStatus(`${PROVIDER_CLINE}-status`, status);
+	});
+
 	pi.on("before_agent_start", async (_event, ctx) => {
 		if (ctx.model?.provider !== PROVIDER_CLINE) return;
 		_currentTaskId = generateUlid();

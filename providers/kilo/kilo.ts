@@ -21,6 +21,7 @@ import {
 	getKiloFreeOnly,
 	getKiloShowPaid,
 	PROVIDER_KILO,
+	saveConfig,
 } from "../../config.ts";
 import { URL_KILO_TOS } from "../../constants.ts";
 import { isFreeModel, registerWithGlobalToggle } from "../../lib/registry.ts";
@@ -165,6 +166,7 @@ export default async function (pi: ExtensionAPI) {
 		description: "Toggle between free and all Kilo models",
 		handler: async (_args, ctx) => {
 			showPaidModels = !showPaidModels;
+			saveConfig({ kilo_show_paid: showPaidModels });
 
 			// Determine which models to show
 			const modelsToShow =
@@ -190,10 +192,30 @@ export default async function (pi: ExtensionAPI) {
 		},
 	});
 
-	// ToS notice on first use
+	// Status bar + ToS notice on provider selection
 	let tosShown = false;
 	pi.on("model_select", async (_event, ctx) => {
-		if (tosShown || ctx.model?.provider !== PROVIDER_KILO) return;
+		if (ctx.model?.provider !== PROVIDER_KILO) {
+			ctx.ui.setStatus(`${PROVIDER_KILO}-status`, undefined);
+			return;
+		}
+
+		// Build status line
+		const free = freeModels.length;
+		const total = allModels.length;
+		const paid = total - free;
+		let status: string;
+		if (paid === 0) {
+			status = `kilo: ${free} free models`;
+		} else if (showPaidModels) {
+			status = `kilo: ${total} models (free + paid)`;
+		} else {
+			status = `kilo: ${free} free \u00b7 ${paid} paid`;
+		}
+		ctx.ui.setStatus(`${PROVIDER_KILO}-status`, status);
+
+		// ToS notice (once)
+		if (tosShown) return;
 		tosShown = true;
 		const cred = ctx.modelRegistry.authStorage.get(PROVIDER_KILO);
 		if (cred?.type === "oauth") return;

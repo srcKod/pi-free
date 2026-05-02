@@ -213,12 +213,30 @@ export function setupProvider(
 		});
 	}
 
-	// ── Clear status when another provider is selected ───────────────────
+	// ── Status bar for selected provider ───────────────────────────
 
 	pi.on("model_select", (_event, ctx) => {
 		if (_event.model?.provider !== providerId) {
 			ctx.ui.setStatus(`${providerId}-status`, undefined);
+			return;
 		}
+
+		// Build status line for this provider
+		const free = stored.free.length;
+		const total = stored.all.length || free;
+		const paid = total - free;
+		let status: string;
+
+		if (paid === 0) {
+			status = `${providerId}: ${free} free models`;
+		} else if (currentShowPaid) {
+			status = `${providerId}: ${total} models (free + paid)`;
+		} else {
+			status = `${providerId}: ${free} free · ${paid} paid`;
+		}
+
+		if (config.hasKey) status += " 🔑";
+		ctx.ui.setStatus(`${providerId}-status`, status);
 	});
 
 	// ── Error handling / usage tracking are temporarily deprecated ─────────

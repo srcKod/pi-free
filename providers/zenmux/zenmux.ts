@@ -20,7 +20,7 @@ import type {
 	ExtensionAPI,
 	ProviderModelConfig,
 } from "@mariozechner/pi-coding-agent";
-import { getZenmuxApiKey } from "../../config.ts";
+import { getZenmuxApiKey, getZenmuxShowPaid } from "../../config.ts";
 import {
 	BASE_URL_ZENMUX,
 	DEFAULT_FETCH_TIMEOUT_MS,
@@ -159,7 +159,7 @@ export default async function zenmuxProvider(pi: ExtensionAPI) {
 		pi,
 		{
 			providerId: PROVIDER_ZENMUX,
-			initialShowPaid: false,
+			initialShowPaid: getZenmuxShowPaid(),
 			reRegister: (models, _stored) => {
 				if (_stored) {
 					stored.free = _stored.free;

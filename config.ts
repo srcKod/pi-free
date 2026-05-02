@@ -24,13 +24,9 @@ const _logger = createLogger("config");
 
 interface PiFreeConfig {
 	nvidia_api_key?: string;
-	cloudflare_api_token?: string;
-	cloudflare_account_id?: string;
 	ollama_api_key?: string;
-	modal_api_key?: string;
 	zenmux_api_key?: string;
 	crofai_api_key?: string;
-	opencode_api_key?: string;
 	mistral_api_key?: string;
 	groq_api_key?: string;
 	cerebras_api_key?: string;
@@ -41,12 +37,8 @@ interface PiFreeConfig {
 	hidden_models?: string[];
 	free_only?: boolean;
 	kilo_show_paid?: boolean;
-	nvidia_show_paid?: boolean;
-	cloudflare_show_paid?: boolean;
 	ollama_show_paid?: boolean;
 	cline_show_paid?: boolean;
-	qwen_show_paid?: boolean;
-	modal_show_paid?: boolean;
 	zenmux_show_paid?: boolean;
 	crofai_show_paid?: boolean;
 	openrouter_show_paid?: boolean;
@@ -55,13 +47,9 @@ interface PiFreeConfig {
 
 const CONFIG_TEMPLATE: PiFreeConfig = {
 	nvidia_api_key: "",
-	cloudflare_api_token: "",
-	cloudflare_account_id: "",
 	ollama_api_key: "",
-	modal_api_key: "",
 	zenmux_api_key: "",
 	crofai_api_key: "",
-	opencode_api_key: "",
 	mistral_api_key: "",
 	groq_api_key: "",
 	cerebras_api_key: "",
@@ -72,12 +60,8 @@ const CONFIG_TEMPLATE: PiFreeConfig = {
 	hidden_models: [],
 	free_only: true,
 	kilo_show_paid: false,
-	nvidia_show_paid: false,
-	cloudflare_show_paid: false,
 	ollama_show_paid: false,
 	cline_show_paid: false,
-	qwen_show_paid: false,
-	modal_show_paid: false,
 	zenmux_show_paid: false,
 	crofai_show_paid: false,
 	openrouter_show_paid: false,
@@ -152,21 +136,8 @@ export function getKiloShowPaid(): boolean {
 	return resolveBool("KILO_SHOW_PAID", loadConfigFile().kilo_show_paid);
 }
 
-export function getNvidiaShowPaid(): boolean {
-	return resolveBool("NVIDIA_SHOW_PAID", loadConfigFile().nvidia_show_paid);
-}
-
 export function getClineShowPaid(): boolean {
 	return resolveBool("CLINE_SHOW_PAID", loadConfigFile().cline_show_paid);
-}
-
-/** @deprecated Qwen provider is deprecated. */
-export function getQwenShowPaid(): boolean {
-	return resolveBool("QWEN_SHOW_PAID", loadConfigFile().qwen_show_paid);
-}
-
-export function getModalShowPaid(): boolean {
-	return resolveBool("MODAL_SHOW_PAID", loadConfigFile().modal_show_paid);
 }
 
 export function getZenmuxShowPaid(): boolean {
@@ -179,13 +150,6 @@ export function getCrofaiShowPaid(): boolean {
 
 export function getOllamaShowPaid(): boolean {
 	return resolveBool("OLLAMA_SHOW_PAID", loadConfigFile().ollama_show_paid);
-}
-
-export function getCloudflareShowPaid(): boolean {
-	return resolveBool(
-		"CLOUDFLARE_SHOW_PAID",
-		loadConfigFile().cloudflare_show_paid,
-	);
 }
 
 export function getOpenrouterShowPaid(): boolean {
@@ -219,10 +183,6 @@ export function getNvidiaApiKey(): string | undefined {
 	return resolve("NVIDIA_API_KEY", loadConfigFile().nvidia_api_key);
 }
 
-export function getModalApiKey(): string | undefined {
-	return resolve("MODAL_API_KEY", loadConfigFile().modal_api_key);
-}
-
 export function getZenmuxApiKey(): string | undefined {
 	return resolve("ZENMUX_API_KEY", loadConfigFile().zenmux_api_key);
 }
@@ -233,21 +193,6 @@ export function getCrofaiApiKey(): string | undefined {
 
 export function getOllamaApiKey(): string | undefined {
 	return resolve("OLLAMA_API_KEY", loadConfigFile().ollama_api_key);
-}
-
-export function getCloudflareApiToken(): string | undefined {
-	return resolve("CLOUDFLARE_API_TOKEN", loadConfigFile().cloudflare_api_token);
-}
-
-export function getCloudflareAccountId(): string | undefined {
-	return resolve(
-		"CLOUDFLARE_ACCOUNT_ID",
-		loadConfigFile().cloudflare_account_id,
-	);
-}
-
-export function getOpencodeApiKey(): string | undefined {
-	return resolve("OPENCODE_API_KEY", loadConfigFile().opencode_api_key);
 }
 
 export function getMistralApiKey(): string | undefined {

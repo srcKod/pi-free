@@ -37,6 +37,39 @@ const _logger = createLogger("pi-free");
 // =============================================================================
 
 function setupGlobalCommands(pi: ExtensionAPI) {
+	// /toggle-free - Global free-only mode toggle
+	pi.registerCommand("toggle-free", {
+		description: "Toggle global free-only mode for all providers",
+		handler: async (_args, ctx) => {
+			const current = getGlobalFreeOnly();
+			const next = !current;
+			applyGlobalFilter(pi, next);
+
+			const registry = getProviderRegistry();
+			const providerCount = registry.size;
+
+			if (next) {
+				const totalFree = [...registry.values()].reduce(
+					(sum, e) => sum + e.stored.free.length,
+					0,
+				);
+				ctx.ui.notify(
+					`Free-only mode: ON (${totalFree} free models across ${providerCount} providers)`,
+					"info",
+				);
+			} else {
+				const totalAll = [...registry.values()].reduce(
+					(sum, e) => sum + (e.stored.all.length || e.stored.free.length),
+					0,
+				);
+				ctx.ui.notify(
+					`Free-only mode: OFF (all ${totalAll} models visible across ${providerCount} providers)`,
+					"info",
+				);
+			}
+		},
+	});
+
 	// /free-providers - Show free model counts by provider
 	pi.registerCommand("free-providers", {
 		description: "Show free/paid model counts for all pi-free providers",

@@ -242,6 +242,21 @@ export default async function (pi: ExtensionAPI) {
 			);
 		},
 	});
+
+	// ── Status bar for provider selection ─────────────────────────
+
+	pi.on("model_select", (_event, ctx) => {
+		if (_event.model?.provider !== PROVIDER_OLLAMA) {
+			ctx.ui.setStatus(`${PROVIDER_OLLAMA}-status`, undefined);
+			return;
+		}
+
+		const count = allModels.length;
+		ctx.ui.setStatus(
+			`${PROVIDER_OLLAMA}-status`,
+			`ollama: ${count} models (usage-based)`,
+		);
+	});
 }
 
 /**
