@@ -16,6 +16,7 @@ scripts/
 todo.md
 *.todo
 .priv/
+.pi/
 
 # Cache directories
 .ruff_cache/
