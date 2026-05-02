@@ -82,6 +82,8 @@ Want to see paid models too? Run the toggle command for your provider:
 /toggle-mistral    # Toggle Mistral (🔧 dynamic - needs API key)
 /toggle-groq       # Toggle Groq (🔧 dynamic - needs API key)
 /toggle-cerebras   # Toggle Cerebras (🔧 dynamic - needs API key)
+/toggle-xai        # Toggle xAI (🔧 dynamic - needs API key)
+/toggle-huggingface # Toggle Hugging Face (🔧 dynamic - needs HF_TOKEN)
 /toggle-zenmux    # Toggle ZenMux (💳 paid - needs API key with credits)
 /toggle-crofai    # Toggle CrofAI (💳 paid - needs API key with credits)
 ```
@@ -111,8 +113,6 @@ Add your API keys to this file:
 {
   "openrouter_api_key": "sk-or-v1-...",
   "nvidia_api_key": "nvapi-...",
-  "cloudflare_api_token": "...",
-  "cloudflare_account_id": "...",
   "ollama_api_key": "...",
   "mistral_api_key": "...",
   "modal_api_key": "sk-modal-..."
@@ -148,7 +148,6 @@ NVIDIA's API lists 130+ models, but 57+ return 404 "Function not found" when you
 - **Auto-discovery from NVIDIA's API** — Queries `integrate.api.nvidia.com/v1/models` directly for the ground-truth list
 - **`/probe-nvidia` command** — On-demand health check: tests every model with a minimal request, auto-hides new 404s, and re-registers immediately
 
-
 ### 🎯 Coding Index (CI) Scores
 
 Every model shows a **Coding Index score** (e.g., `CI: 52.3`) in the model picker:
@@ -159,13 +158,13 @@ Every model shows a **Coding Index score** (e.g., `CI: 52.3`) in the model picke
 
 **Missing CI scores?** Provider model IDs often don't match benchmark database keys exactly. pi-free applies provider-specific normalization to improve matching:
 
-| Provider       | Normalization Applied                                              |
-| -------------- | ------------------------------------------------------------------ |
-| **NVIDIA**     | Strips vendor prefixes (`meta/`, `mistralai/`, `microsoft/`, etc.) |
-| **Groq**       | Removes `-versatile` and numeric suffixes (`-32768`)               |
-| **Cerebras**   | Normalizes `llama3.1` → `llama-3.1`, adds `instruct` suffix        |
-| **Mistral**    | Strips `-latest` suffix                                            |
-| **Ollama**     | Converts `model:tag` → `model-tag`                                 |
+| Provider     | Normalization Applied                                              |
+| ------------ | ------------------------------------------------------------------ |
+| **NVIDIA**   | Strips vendor prefixes (`meta/`, `mistralai/`, `microsoft/`, etc.) |
+| **Groq**     | Removes `-versatile` and numeric suffixes (`-32768`)               |
+| **Cerebras** | Normalizes `llama3.1` → `llama-3.1`, adds `instruct` suffix        |
+| **Mistral**  | Strips `-latest` suffix                                            |
+| **Ollama**   | Converts `model:tag` → `model-tag`                                 |
 
 **Debug missing scores:** Check `~/.pi/modelmatch.log` to see which models matched/didn't match and what normalization was applied.
 
@@ -310,37 +309,7 @@ Or in `~/.pi/free.json`:
 
 Toggle anytime with `/toggle-nvidia`
 
-
-# Legacy env vars also work
-export CLOUDFLARE_API_TOKEN="your_token_here"
-export CLOUDFLARE_ACCOUNT_ID="your_account_id"
-```
-
 **Models available:** Llama 4/3.x, Mistral Small 3.1, DeepSeek R1, Gemma 4, Kimi K2.5/2.6, Qwen 3/2.5, OpenAI GPT-OSS, and more.
-
-### Modal (GLM-5.1 FP8 — free promotional period until April 30, 2026)
-
-Modal hosts GLM-5.1 FP8 with a free promotional period. Get an API key at [modal.com](https://modal.com), then:
-
-**Option A: Environment variable**
-
-```bash
-export MODAL_API_KEY="sk-modal-..."
-```
-
-**Option B: Config file** (`~/.pi/free.json`)
-
-```json
-{
-  "modal_api_key": "sk-modal-..."
-}
-```
-
-**Details:**
-
-- Free promotional period until April 30, 2026
-- Model: GLM-5.1 FP8 (128k context, 16k max output)
-- No credit card required during the promotional period
 
 ### Ollama Cloud
 
@@ -380,17 +349,19 @@ export MISTRAL_API_KEY="..."
 
 Each provider has toggle commands to switch between free and all models:
 
-| Command              | Action                                               |
-| -------------------- | ---------------------------------------------------- |
-| `/toggle-opencode`   | Toggle between free/all OpenCode models              |
-| `/toggle-kilo`       | Toggle between free/all Kilo models                  |
-| `/toggle-openrouter` | Toggle between free/all OpenRouter models            |
-| `/toggle-cline`      | Toggle between free/all Cline models                 |
-| `/toggle-nvidia`     | Toggle between free/all NVIDIA models                |
-| `/toggle-ollama`     | Toggle between free/all Ollama Cloud models          |
-| `/toggle-mistral`    | Toggle between free/all Mistral models (🔧 dynamic)  |
-| `/toggle-groq`       | Toggle between free/all Groq models (🔧 dynamic)     |
-| `/toggle-cerebras`   | Toggle between free/all Cerebras models (🔧 dynamic) |
+| Command               | Action                                                   |
+| --------------------- | -------------------------------------------------------- |
+| `/toggle-opencode`    | Toggle between free/all OpenCode models                  |
+| `/toggle-kilo`        | Toggle between free/all Kilo models                      |
+| `/toggle-openrouter`  | Toggle between free/all OpenRouter models                |
+| `/toggle-cline`       | Toggle between free/all Cline models                     |
+| `/toggle-nvidia`      | Toggle between free/all NVIDIA models                    |
+| `/toggle-ollama`      | Toggle between free/all Ollama Cloud models              |
+| `/toggle-mistral`     | Toggle between free/all Mistral models (🔧 dynamic)      |
+| `/toggle-groq`        | Toggle between free/all Groq models (🔧 dynamic)         |
+| `/toggle-cerebras`    | Toggle between free/all Cerebras models (🔧 dynamic)     |
+| `/toggle-xai`         | Toggle between free/all xAI models (🔧 dynamic)          |
+| `/toggle-huggingface` | Toggle between free/all Hugging Face models (🔧 dynamic) |
 
 /toggle-zenmux # Toggle ZenMux (💳 paid - needs API key with credits)
 /toggle-crofai # Toggle CrofAI (💳 paid - needs API key with credits)
@@ -432,13 +403,10 @@ Create `~/.pi/free.json` in your home directory:
 {
   "openrouter_api_key": "YOUR_OPENROUTER_KEY",
   "nvidia_api_key": "YOUR_NVIDIA_KEY",
-  "cloudflare_api_token": "YOUR_CLOUDFLARE_TOKEN",
-  "cloudflare_account_id": "YOUR_ACCOUNT_ID",
   "mistral_api_key": "YOUR_MISTRAL_KEY",
   "opencode_api_key": "YOUR_OPENCODE_KEY",
   "ollama_api_key": "YOUR_OLLAMA_KEY",
   "ollama_show_paid": true,
-  "modal_api_key": "YOUR_MODAL_KEY",
   "hidden_models": ["model-id-to-hide"]
 }
 ```

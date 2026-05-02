@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.3] - 2026-05-02
 
 ### Added
 
@@ -23,21 +23,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Comprehensive `isFreeModel` test suite** — Added 30+ unit tests covering Route A, Route B, freemium behavior, and edge cases. Tests verify correct classification on actual OpenRouter API data (371 models, 30 free).
 
+- **Toggle commands for dynamic built-in providers** — Added `/toggle-mistral`, `/toggle-groq`,
+  `/toggle-cerebras`, `/toggle-xai`, and `/toggle-huggingface` commands. These providers were
+  registered with the global toggle system but lacked per-provider toggle commands, making
+  free/paid switching inaccessible without editing config files.
+
+- **Lazy auto-probe for NVIDIA models** — Extracted `runNvidiaProbe()` into a shared function
+  called automatically on first `session_start` (once per session). Previously, users had to
+  manually run `/probe-nvidia` to discover 404 models. Now broken models are detected and
+  auto-hidden on first use.
+
 ### Changed
 
 - **Cline provider now uses `isFreeModel`** — Fixed Cline to use the consistent `isFreeModel` helper instead of `m.cost.input === 0`. Previously used cost-only filtering, now uses proper OR logic for pricing-exposed providers.
 
 - **NVIDIA test expectations updated** — Updated tests to reflect strict Route B behavior (name-only detection for non-pricing-exposed providers). Added test for models with `"free"` in name being marked as free.
-
-### Removed
-
-- **Qwen provider (deprecated)** — Removed Qwen OAuth provider as the 1,000 req/day free tier is no longer available. Provider remains functional for existing authenticated users but new free tier registrations are not supported.
-
-- **Modal provider** — Removed single-model Modal provider (only had GLM-5.1 FP8). Users should use other providers for GLM models.
-
-- **Cloudflare provider** — Removed Cloudflare Workers AI provider as it's now built into pi core. Users can use pi's built-in Cloudflare provider instead.
-
-- **Qwen test file** — Removed `tests/qwen.test.ts` along with the deprecated provider.
 
 ### Fixed
 
@@ -57,17 +57,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`index.ts` — Removed redundant `.catch()` on deprecated Qwen provider** — The `.catch()`
   was unnecessary since `Promise.allSettled` already handles rejections.
 
-### Added
+### Removed
 
-- **Toggle commands for dynamic built-in providers** — Added `/toggle-mistral`, `/toggle-groq`,
-  `/toggle-cerebras`, `/toggle-xai`, and `/toggle-huggingface` commands. These providers were
-  registered with the global toggle system but lacked per-provider toggle commands, making
-  free/paid switching inaccessible without editing config files.
+- **Qwen provider (deprecated)** — Removed Qwen OAuth provider as the 1,000 req/day free tier is no longer available. Provider remains functional for existing authenticated users but new free tier registrations are not supported.
 
-- **Lazy auto-probe for NVIDIA models** — Extracted `runNvidiaProbe()` into a shared function
-  called automatically on first `session_start` (once per session). Previously, users had to
-  manually run `/probe-nvidia` to discover 404 models. Now broken models are detected and
-  auto-hidden on first use.
+- **Modal provider** — Removed single-model Modal provider (only had GLM-5.1 FP8). Users should use other providers for GLM models.
+
+- **Cloudflare provider** — Removed Cloudflare Workers AI provider as it's now built into pi core. Users can use pi's built-in Cloudflare provider instead.
+
+- **Qwen test file** — Removed `tests/qwen.test.ts` along with the deprecated provider.
 
 ## [2.0.2] - 2026-04-26
 
@@ -138,17 +136,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added regex-based non-chat model filtering for unknown models (embeddings, whisper, reward models, safety guards, parsers, detectors, etc.)
   - Graceful fallback to `models.dev` if NVIDIA API is unreachable
   - Removed paid/free toggle filtering — NVIDIA is freemium (all models use free credits)
-
-## [2.0.2] - 2026-04-24
-
-### Fixed
-
-- **Provider toggle state now persists reliably** — Follow-up fixes to the new `toggle-{provider}` flow ensure saved free-vs-all preferences are restored consistently across sessions for built-in and extension-managed providers.
-- **Config parse errors are now logged** — Invalid `~/.pi/free.json` content is no longer ignored silently; startup parse failures are written to `~/.pi/free.log` to make misconfiguration easier to diagnose.
-
-### Changed
-
-- **README refreshed** — Clarified that provider toggle changes apply immediately, persist across restarts, and that malformed config is surfaced in the extension log.
 
 ## [2.0.1] - 2026-04-24
 
