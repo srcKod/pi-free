@@ -445,6 +445,31 @@ export async function setupDynamicBuiltInProviders(
 				true, // hasKey
 			);
 
+			// ── Status bar for provider selection ─────────────────
+
+			const pid = config.providerId;
+			pi.on("model_select", (_event, ctx) => {
+				if (_event.model?.provider !== pid) {
+					ctx.ui.setStatus(`${pid}-status`, undefined);
+					return;
+				}
+
+				const f = freeModels.length;
+				const t = allModels.length;
+				const p = t - f;
+				const m = toggleState.getCurrentMode();
+				let status: string;
+				if (p === 0) {
+					status = `${pid}: ${f} free models`;
+				} else if (m === "all") {
+					status = `${pid}: ${t} models (free + paid)`;
+				} else {
+					status = `${pid}: ${f} free \u00b7 ${p} paid`;
+				}
+				status += " 🔑";
+				ctx.ui.setStatus(`${pid}-status`, status);
+			});
+
 			// Initial registration (respect config state)
 			toggleState.applyCurrent(reRegister);
 

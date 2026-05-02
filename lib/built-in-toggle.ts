@@ -60,6 +60,7 @@ export function setupBuiltInProviderToggles(pi: ExtensionAPI): void {
 		for (const config of BUILT_IN_TOGGLE_PROVIDERS) {
 			registerToggleCommand(pi, config);
 		}
+		setupStatusBar(pi);
 		commandsRegistered = true;
 	}
 
@@ -178,6 +179,42 @@ function modelToProviderConfig(m: Model<Api>): ProviderModelConfig {
 		headers: m.headers,
 		compat: (m as any).compat,
 	};
+}
+
+// =============================================================================
+// Status bar for provider selection
+// =============================================================================
+
+function setupStatusBar(pi: ExtensionAPI): void {
+	pi.on("model_select", (_event, ctx) => {
+		const selected = _event.model?.provider;
+
+		// Clear status for all built-in toggle providers
+		for (const config of BUILT_IN_TOGGLE_PROVIDERS) {
+			if (selected !== config.id) {
+				ctx.ui.setStatus(`${config.id}-status`, undefined);
+			}
+		}
+
+		if (!selected) return;
+
+		const state = providerStates.get(selected);
+		if (!state) return;
+
+		const free = state.stored.free.length;
+		const total = state.stored.all.length;
+		const paid = total - free;
+		const mode = state.toggleState.getCurrentMode();
+		let status: string;
+		if (paid === 0) {
+			status = `${selected}: ${free} free models`;
+		} else if (mode === "all") {
+			status = `${selected}: ${total} models (free + paid)`;
+		} else {
+			status = `${selected}: ${free} free \u00b7 ${paid} paid`;
+		}
+		ctx.ui.setStatus(`${selected}-status`, status);
+	});
 }
 
 function getApiKeyEnvForProvider(providerId: string): string {

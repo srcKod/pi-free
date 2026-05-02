@@ -36,7 +36,6 @@
 		"provider-failover/**/*.ts",
 		"config.ts",
 		"constants.ts",
-		"provider-factory.ts",
 		"provider-helper.ts",
 		"README.md",
 		"LICENSE",

@@ -19,7 +19,7 @@ import type {
 	ExtensionAPI,
 	ProviderModelConfig,
 } from "@mariozechner/pi-coding-agent";
-import { getCrofaiApiKey } from "../../config.ts";
+import { getCrofaiApiKey, getCrofaiShowPaid } from "../../config.ts";
 import {
 	BASE_URL_CROFAI,
 	DEFAULT_FETCH_TIMEOUT_MS,
@@ -153,7 +153,7 @@ export default async function crofaiProvider(pi: ExtensionAPI) {
 		pi,
 		{
 			providerId: PROVIDER_CROFAI,
-			initialShowPaid: false,
+			initialShowPaid: getCrofaiShowPaid(),
 			reRegister: (models, _stored) => {
 				if (_stored) {
 					stored.free = _stored.free;

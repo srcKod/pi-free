@@ -457,5 +457,20 @@ export default async function (pi: ExtensionAPI) {
 		},
 	});
 
+	// ── Status bar for provider selection ─────────────────────────
+
+	pi.on("model_select", (_event, ctx) => {
+		if (_event.model?.provider !== PROVIDER_NVIDIA) {
+			ctx.ui.setStatus(`${PROVIDER_NVIDIA}-status`, undefined);
+			return;
+		}
+
+		const count = allModels.length;
+		ctx.ui.setStatus(
+			`${PROVIDER_NVIDIA}-status`,
+			`nvidia: ${count} models (freemium)`,
+		);
+	});
+
 	// Registration complete - models registered silently (use LOG_LEVEL=info to see details)
 }
