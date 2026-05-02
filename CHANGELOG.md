@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.4] - 2026-05-02
+
+### Fixed
+
+- **OpenRouter key resolution no longer falls back to `free.json`** —
+  `getOpenrouterApiKey()` now only checks the `OPENROUTER_API_KEY` environment variable.
+  Previously it fell back to `~/.pi/free.json`, which could contain stale/revoked keys
+  that conflict with pi's built-in OpenRouter provider (which reads from
+  `~/.pi/agent/auth.json`).
+
+- **Removed `openrouter_api_key` from `PiFreeConfig` interface and config template** —
+  Prevents future persistence of OpenRouter keys in `free.json`, eliminating the
+  source of stale key conflicts for built-in providers.
+
 ## [2.0.3] - 2026-05-02
 
 ### Added
