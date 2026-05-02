@@ -72,7 +72,11 @@ export function detectModelFamily(
 	const fullText = `${id} ${name}`;
 
 	// Router models (gateways to free models) - group into "other"
-	if (/\brouter\b/.test(fullText) || /\bauto\b/.test(fullText) || id === "kilo-auto/free") {
+	if (
+		/\brouter\b/.test(fullText) ||
+		/\bauto\b/.test(fullText) ||
+		id === "kilo-auto/free"
+	) {
 		return { familyId: "other", familyName: "Other" };
 	}
 
@@ -107,7 +111,10 @@ export function detectModelFamily(
 	}
 
 	// Provider-specific fallbacks for models without brand in ID/name
-	const providerMappings: Record<string, { familyId: string; familyName: string }> = {
+	const providerMappings: Record<
+		string,
+		{ familyId: string; familyName: string }
+	> = {
 		minimax: { familyId: "minimax", familyName: "MiniMax" },
 		minimaxai: { familyId: "minimax", familyName: "MiniMax" },
 		deepseek: { familyId: "deepseek", familyName: "DeepSeek" },
@@ -121,12 +128,17 @@ export function detectModelFamily(
 	}
 
 	// Helper to find brand in ID parts
-	function findBrandInParts(parts: string[]): { familyId: string; familyName: string } | null {
+	function findBrandInParts(
+		parts: string[],
+	): { familyId: string; familyName: string } | null {
 		for (const part of parts) {
 			for (const mapping of brandMappings) {
 				for (const keyword of mapping.keywords) {
 					if (part.includes(keyword)) {
-						return { familyId: mapping.familyId, familyName: mapping.familyName };
+						return {
+							familyId: mapping.familyId,
+							familyName: mapping.familyName,
+						};
 					}
 				}
 			}
@@ -169,7 +181,9 @@ export function detectModelFamily(
 			if (
 				part &&
 				!/^v?\d+(\.\d+)?$/.test(part) &&
-				!["latest", "preview", "rc", "beta", "alpha", "dev", "free"].includes(part)
+				!["latest", "preview", "rc", "beta", "alpha", "dev", "free"].includes(
+					part,
+				)
 			) {
 				return {
 					familyId: part,
@@ -181,7 +195,8 @@ export function detectModelFamily(
 
 	return {
 		familyId: firstPart || id,
-		familyName: (firstPart || id).charAt(0).toUpperCase() + (firstPart || id).slice(1),
+		familyName:
+			(firstPart || id).charAt(0).toUpperCase() + (firstPart || id).slice(1),
 	};
 }
 
@@ -189,21 +204,32 @@ export function detectModelFamily(
  * Normalize a model name for comparison by removing provider-specific suffixes
  * and common qualifiers. This helps detect when the same model is offered by
  * multiple providers with slightly different naming.
+ *
+ * Uses string operations instead of regex backtracking to avoid ReDoS warnings.
  */
 export function normalizeModelName(name: string): string {
-	return (
-		name
-			.toLowerCase()
-			// Remove common suffixes added by providers
-			.replace(/\s*\(free\)\s*$/i, "")
-			.replace(/\s*\(cline\)\s*$/i, "")
-			.replace(/\s*\(ci:\s*[\d.]+\)\s*$/i, "")
-			.replace(/\s*\[ci:\s*[\d.]+\]\s*$/i, "")
-			.replace(/\s*\([^)]*\)\s*$/g, "") // Remove any trailing parenthetical
-			.replace(/\s*-\s*free\s*$/i, "") // e.g., "minimax-m2.5-free"
-			.replace(/\s*free\s*$/i, "") // trailing "free"
-			.trim()
-	);
+	const suffixes = ["(free)", "(cline)", "-free", "free"];
+	let normalized = name.toLowerCase().trimEnd();
+
+	// Remove common literal suffixes — simple string ops, no regex backtracking
+	for (const suffix of suffixes) {
+		while (normalized.endsWith(suffix)) {
+			normalized = normalized.slice(0, -suffix.length).trimEnd();
+		}
+	}
+
+	// CI score suffix — regex with disjoint char classes (linear)
+	normalized = normalized.replace(/\(ci:\s*[\d.]+\)$/, "").trimEnd();
+	normalized = normalized.replace(/\[ci:\s*[\d.]+\]$/, "").trimEnd();
+
+	// Remove any trailing parenthetical — non-regex loop
+	while (normalized.endsWith(")")) {
+		const idx = normalized.lastIndexOf("(", normalized.length - 1);
+		if (idx === -1) break;
+		normalized = normalized.slice(0, idx).trimEnd();
+	}
+
+	return normalized.trim();
 }
 
 /**
