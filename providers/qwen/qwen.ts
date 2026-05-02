@@ -10,18 +10,18 @@
  * 1,000 free API calls/day — run /login qwen to authenticate.~~
  */
 
-import type { OAuthCredentials, Model, Api } from "@mariozechner/pi-ai";
+import type { Api, Model, OAuthCredentials } from "@mariozechner/pi-ai";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { PROVIDER_QWEN, URL_QWEN_TOS } from "../../constants.ts";
+import { createLogger } from "../../lib/logger.ts";
+import { logWarning } from "../../lib/util.ts";
 import {
+	createReRegister,
 	enhanceWithCI,
 	type StoredModels,
 	setupProvider,
-	createReRegister,
 } from "../../provider-helper.ts";
-import { logWarning } from "../../lib/util.ts";
-import { createLogger } from "../../lib/logger.ts";
-import { loginQwen, refreshQwenToken, getQwenBaseUrl } from "./qwen-auth.ts";
+import { getQwenBaseUrl, loginQwen, refreshQwenToken } from "./qwen-auth.ts";
 import { fetchQwenModels } from "./qwen-models.ts";
 
 // =============================================================================
@@ -61,10 +61,12 @@ const DASHSCOPE_HEADERS = {
 
 export default async function (pi: ExtensionAPI) {
 	// DEPRECATION WARNING
-	_logger.warn("Qwen provider is deprecated. The 1,000 req/day free tier is no longer available.");
+	_logger.warn(
+		"Qwen provider is deprecated. The 1,000 req/day free tier is no longer available.",
+	);
 
 	// Fetch static free-tier models
-	let models = await fetchQwenModels().catch((err) => {
+	const models = await fetchQwenModels().catch((err) => {
 		logWarning("qwen", "Failed to load models at startup", err);
 		return [];
 	});
@@ -148,55 +150,51 @@ export default async function (pi: ExtensionAPI) {
 	// getApiKey() call will trigger a token refresh via refreshToken().
 	// This mirrors qwen-code's executeWithCredentialManagement() retry logic.
 	//
+	function isQwenAuthError(msg: {
+		role?: string;
+		errorMessage?: string;
+	}): boolean {
+		if (msg.role !== "assistant" || !msg.errorMessage) return false;
+		const errLower = msg.errorMessage.toLowerCase();
+		return AUTH_ERROR_PATTERNS.some((p) => errLower.includes(p));
+	}
+
+	function forceExpireQwenToken(
+		ctx: any,
+		msg: { errorMessage?: string },
+	): void {
+		_logger.warn("Qwen auth error detected, force-expiring token for refresh", {
+			error: (msg.errorMessage ?? "").slice(0, 100),
+		});
+
+		try {
+			const authStorage = (ctx as any).modelRegistry?.authStorage;
+			if (authStorage) {
+				const cred = authStorage.get(PROVIDER_QWEN);
+				if (cred?.type === "oauth" && cred.expires > Date.now()) {
+					authStorage.set(PROVIDER_QWEN, { ...cred, expires: 0 });
+					_logger.info(
+						"Qwen token force-expired; will refresh on next request",
+					);
+				}
+			}
+			ctx.ui.notify("Qwen: auth error detected, refreshing token…", "warning");
+		} catch (e) {
+			_logger.warn("Failed to force-expire Qwen token", {
+				error: e instanceof Error ? e.message : String(e),
+			});
+		}
+	}
+
 	pi.on("turn_end", async (event, ctx) => {
 		if (ctx.model?.provider !== PROVIDER_QWEN) return;
-		// NOTE: Request counting removed - usage tracking was deleted in refactor
 
 		const msg = (
 			event as { message?: { role?: string; errorMessage?: string } }
 		).message;
 
-		if (msg?.role === "assistant" && msg.errorMessage) {
-			const errLower = msg.errorMessage.toLowerCase();
-			const isAuthError = AUTH_ERROR_PATTERNS.some((p) =>
-				errLower.includes(p),
-			);
-
-			if (isAuthError) {
-				_logger.warn(
-					"Qwen auth error detected, force-expiring token for refresh",
-					{ error: msg.errorMessage.slice(0, 100) },
-				);
-
-				// Force-expire the stored credential so the next getApiKey() call
-				// triggers refreshQwenToken(). The credential object in auth.json
-				// is updated with expires = 0 (already past).
-				try {
-					const authStorage =
-						(ctx as any).modelRegistry?.authStorage;
-					if (authStorage) {
-						const cred = authStorage.get(PROVIDER_QWEN);
-						if (cred?.type === "oauth" && cred.expires > Date.now()) {
-							// Set expiry to 0 to force refresh on next request
-							authStorage.set(PROVIDER_QWEN, {
-								...cred,
-								expires: 0,
-							});
-							_logger.info(
-								"Qwen token force-expired; will refresh on next request",
-							);
-						}
-					}
-					ctx.ui.notify(
-						"Qwen: auth error detected, refreshing token…",
-						"warning",
-					);
-				} catch (e) {
-					_logger.warn("Failed to force-expire Qwen token", {
-						error: e instanceof Error ? e.message : String(e),
-					});
-				}
-			}
+		if (msg && isQwenAuthError(msg)) {
+			forceExpireQwenToken(ctx, msg);
 		}
 	});
 }

@@ -170,39 +170,35 @@ function inferModelFromId(id: string): ModelsDevModel | null {
 // Fetch + map
 // =============================================================================
 
-async function fetchNvidiaModels(
-	apiKey?: string,
-): Promise<ProviderModelConfig[]> {
-	// ── 1. Query NVIDIA's actual API (source of truth) ─────────────────
-	let apiModelIds = new Set<string>();
-	if (apiKey) {
-		try {
-			const response = await fetchWithRetry(
-				`${BASE_URL_NVIDIA}/models`,
-				{
-					headers: {
-						Authorization: `Bearer ${apiKey}`,
-						"User-Agent": "pi-free-providers",
-					},
+async function fetchNvidiaApiModelIds(apiKey: string): Promise<Set<string>> {
+	try {
+		const response = await fetchWithRetry(
+			`${BASE_URL_NVIDIA}/models`,
+			{
+				headers: {
+					Authorization: `Bearer ${apiKey}`,
+					"User-Agent": "pi-free-providers",
 				},
-				3,
-				1000,
-				DEFAULT_FETCH_TIMEOUT_MS,
-			);
-			if (response.ok) {
-				const json = (await response.json()) as {
-					data?: Array<{ id: string }>;
-				};
-				if (json.data) {
-					apiModelIds = new Set(json.data.map((m) => m.id));
-				}
+			},
+			3,
+			1000,
+			DEFAULT_FETCH_TIMEOUT_MS,
+		);
+		if (response.ok) {
+			const json = (await response.json()) as {
+				data?: Array<{ id: string }>;
+			};
+			if (json.data) {
+				return new Set(json.data.map((m) => m.id));
 			}
-		} catch (error) {
-			console.error("[nvidia] Failed to fetch models from NVIDIA API", error);
 		}
+	} catch (error) {
+		console.error("[nvidia] Failed to fetch models from NVIDIA API", error);
 	}
+	return new Set();
+}
 
-	// ── 2. Fetch models.dev for rich metadata (cost, limits, etc.) ─────
+async function fetchModelsDevMetadata(): Promise<Map<string, ModelsDevModel>> {
 	const devModels = new Map<string, ModelsDevModel>();
 	try {
 		const response = await fetchWithRetry(
@@ -226,6 +222,27 @@ async function fetchNvidiaModels(
 	} catch (error) {
 		console.error("[nvidia] Failed to fetch models.dev", error);
 	}
+	return devModels;
+}
+
+function isChatModel(m: ModelsDevModel): boolean {
+	const modalities = m.modalities;
+	if (!modalities) return true;
+	const output = modalities.output ?? [];
+	const input = modalities.input ?? [];
+	return output.includes("text") && input.includes("text");
+}
+
+async function fetchNvidiaModels(
+	apiKey?: string,
+): Promise<ProviderModelConfig[]> {
+	// ── 1. Query NVIDIA's actual API (source of truth) ─────────────────
+	const apiModelIds = apiKey
+		? await fetchNvidiaApiModelIds(apiKey)
+		: new Set<string>();
+
+	// ── 2. Fetch models.dev for rich metadata (cost, limits, etc.) ─────
+	const devModels = await fetchModelsDevMetadata();
 
 	// ── 3. Build unified list (NVIDIA API wins; fallback to models.dev) ─
 	const modelIds =
@@ -233,30 +250,11 @@ async function fetchNvidiaModels(
 
 	const result = applyHidden(
 		modelIds
-			.map((id) => {
-				const dev = devModels.get(id);
-				if (dev) return dev;
-				return inferModelFromId(id);
-			})
+			.map((id) => devModels.get(id) ?? inferModelFromId(id))
 			.filter((m): m is ModelsDevModel => m !== null)
 			.filter((m) => isUsableModel(m.id, NVIDIA_MIN_SIZE_B))
-			.filter((m) => {
-				const modalities = m.modalities;
-				if (modalities) {
-					const output = modalities.output ?? [];
-					const input = modalities.input ?? [];
-					if (!output.includes("text")) return false;
-					if (!input.includes("text")) return false;
-				}
-				return true;
-			})
-			// Filter out known 404 models (listed but not provisioned for chat)
-			.filter((m) => {
-				if (NVIDIA_KNOWN_404_MODELS.has(m.id)) {
-					return false;
-				}
-				return true;
-			})
+			.filter(isChatModel)
+			.filter((m) => !NVIDIA_KNOWN_404_MODELS.has(m.id))
 			// NVIDIA is freemium — all models are usable with free credits.
 			// No cost filtering applied.
 			.map(

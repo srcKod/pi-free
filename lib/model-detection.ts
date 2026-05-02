@@ -60,6 +60,83 @@ export function toProviderModelInfo(model: ProviderModelConfig): ModelInfo {
 	};
 }
 
+// =============================================================================
+// Shared helpers for model family detection
+// =============================================================================
+
+const VERSION_RE = /^v?\d+(\.\d+)?$/;
+const ROUTER_RE = /\b(?:router|auto)\b/;
+const SKIP_PARTS = new Set([
+	"latest",
+	"preview",
+	"rc",
+	"beta",
+	"alpha",
+	"dev",
+	"free",
+]);
+
+interface BrandMapping {
+	keywords: string[];
+	familyId: string;
+	familyName: string;
+}
+
+const BRAND_MAPPINGS: BrandMapping[] = [
+	{ keywords: ["claude"], familyId: "claude", familyName: "Claude" },
+	{ keywords: ["deepseek"], familyId: "deepseek", familyName: "DeepSeek" },
+	{ keywords: ["gemini"], familyId: "gemini", familyName: "Gemini" },
+	{ keywords: ["gpt"], familyId: "gpt", familyName: "GPT" },
+	{ keywords: ["llama"], familyId: "llama", familyName: "Llama" },
+	{ keywords: ["minimax"], familyId: "minimax", familyName: "MiniMax" },
+	{ keywords: ["qwen"], familyId: "qwen", familyName: "Qwen" },
+	{ keywords: ["nemotron"], familyId: "nemotron", familyName: "Nemotron" },
+	{ keywords: ["kimi", "moonshot"], familyId: "kimi", familyName: "Kimi" },
+	{ keywords: ["glm", "chatglm"], familyId: "glm", familyName: "GLM" },
+	{ keywords: ["mistral"], familyId: "mistral", familyName: "Mistral" },
+	{ keywords: ["arcee", "trinity"], familyId: "arcee", familyName: "Arcee" },
+	{ keywords: ["o1", "o3"], familyId: "openai-o", familyName: "OpenAI o" },
+];
+
+const PROVIDER_MAPPINGS: Record<
+	string,
+	{ familyId: string; familyName: string }
+> = {
+	minimax: { familyId: "minimax", familyName: "MiniMax" },
+	minimaxai: { familyId: "minimax", familyName: "MiniMax" },
+	deepseek: { familyId: "deepseek", familyName: "DeepSeek" },
+	nvidia: { familyId: "nemotron", familyName: "Nemotron" },
+	moonshot: { familyId: "kimi", familyName: "Kimi" },
+	zhipu: { familyId: "glm", familyName: "GLM" },
+};
+
+function capitalize(s: string): string {
+	return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function findBrandInText(
+	text: string,
+): { familyId: string; familyName: string } | null {
+	for (const mapping of BRAND_MAPPINGS) {
+		for (const keyword of mapping.keywords) {
+			if (text.includes(keyword)) {
+				return { familyId: mapping.familyId, familyName: mapping.familyName };
+			}
+		}
+	}
+	return null;
+}
+
+function findBrandInParts(
+	parts: string[],
+): { familyId: string; familyName: string } | null {
+	for (const part of parts) {
+		const result = findBrandInText(part);
+		if (result) return result;
+	}
+	return null;
+}
+
 /**
  * Detect the model family from a model's ID or name.
  * Returns the family ID and display name.
@@ -72,131 +149,41 @@ export function detectModelFamily(
 	const fullText = `${id} ${name}`;
 
 	// Router models (gateways to free models) - group into "other"
-	if (
-		/\brouter\b/.test(fullText) ||
-		/\bauto\b/.test(fullText) ||
-		id === "kilo-auto/free"
-	) {
+	if (ROUTER_RE.test(fullText) || id === "kilo-auto/free") {
 		return { familyId: "other", familyName: "Other" };
 	}
 
-	// Known brand keywords - order matters: more specific/longer matches first
-	const brandMappings: {
-		keywords: string[];
-		familyId: string;
-		familyName: string;
-	}[] = [
-		{ keywords: ["claude"], familyId: "claude", familyName: "Claude" },
-		{ keywords: ["deepseek"], familyId: "deepseek", familyName: "DeepSeek" },
-		{ keywords: ["gemini"], familyId: "gemini", familyName: "Gemini" },
-		{ keywords: ["gpt"], familyId: "gpt", familyName: "GPT" },
-		{ keywords: ["llama"], familyId: "llama", familyName: "Llama" },
-		{ keywords: ["minimax"], familyId: "minimax", familyName: "MiniMax" },
-		{ keywords: ["qwen"], familyId: "qwen", familyName: "Qwen" },
-		{ keywords: ["nemotron"], familyId: "nemotron", familyName: "Nemotron" },
-		{ keywords: ["kimi", "moonshot"], familyId: "kimi", familyName: "Kimi" },
-		{ keywords: ["glm", "chatglm"], familyId: "glm", familyName: "GLM" },
-		{ keywords: ["mistral"], familyId: "mistral", familyName: "Mistral" },
-		{ keywords: ["arcee", "trinity"], familyId: "arcee", familyName: "Arcee" },
-		{ keywords: ["o1", "o3"], familyId: "openai-o", familyName: "OpenAI o" },
-	];
-
-	// Check for known brands in ID or name
-	for (const mapping of brandMappings) {
-		for (const keyword of mapping.keywords) {
-			if (fullText.includes(keyword)) {
-				return { familyId: mapping.familyId, familyName: mapping.familyName };
-			}
-		}
-	}
+	// Known brand keywords in full text
+	const brandFromText = findBrandInText(fullText);
+	if (brandFromText) return brandFromText;
 
 	// Provider-specific fallbacks for models without brand in ID/name
-	const providerMappings: Record<
-		string,
-		{ familyId: string; familyName: string }
-	> = {
-		minimax: { familyId: "minimax", familyName: "MiniMax" },
-		minimaxai: { familyId: "minimax", familyName: "MiniMax" },
-		deepseek: { familyId: "deepseek", familyName: "DeepSeek" },
-		nvidia: { familyId: "nemotron", familyName: "Nemotron" },
-		moonshot: { familyId: "kimi", familyName: "Kimi" },
-		zhipu: { familyId: "glm", familyName: "GLM" },
-	};
+	const providerResult = PROVIDER_MAPPINGS[model.provider];
+	if (providerResult) return providerResult;
 
-	if (providerMappings[model.provider]) {
-		return providerMappings[model.provider];
-	}
-
-	// Helper to find brand in ID parts
-	function findBrandInParts(
-		parts: string[],
-	): { familyId: string; familyName: string } | null {
-		for (const part of parts) {
-			for (const mapping of brandMappings) {
-				for (const keyword of mapping.keywords) {
-					if (part.includes(keyword)) {
-						return {
-							familyId: mapping.familyId,
-							familyName: mapping.familyName,
-						};
-					}
-				}
-			}
-		}
-		return null;
-	}
-
-	// Smart fallback: try to identify brand from model ID structure
+	// Fallback: try to identify brand from model ID structure
 	const parts = id.split(/[-_:.@]/);
 	const firstPart = parts[0];
 
-	// If ID starts with a version number, check remaining parts for brand
-	if (firstPart && /^v?\d+(\.\d+)?$/.test(firstPart)) {
-		const brandFromParts = findBrandInParts(parts.slice(1));
-		if (brandFromParts) {
-			return brandFromParts;
-		}
+	const brandFromParts = findBrandInParts(parts);
+	if (brandFromParts) return brandFromParts;
+
+	// Use first part as brand if it looks brand-like
+	if (firstPart && !VERSION_RE.test(firstPart)) {
+		return { familyId: firstPart, familyName: capitalize(firstPart) };
 	}
 
-	// If ID has multiple parts, check ALL parts for brand keywords
-	if (parts.length > 1) {
-		const brandFromParts = findBrandInParts(parts);
-		if (brandFromParts) {
-			return brandFromParts;
-		}
-
-		// Use first part as brand if it looks brand-like
-		if (firstPart && !/^v?\d+(\.\d+)?$/.test(firstPart)) {
-			return {
-				familyId: firstPart,
-				familyName: firstPart.charAt(0).toUpperCase() + firstPart.slice(1),
-			};
-		}
-	}
-
-	// Last resort: use first non-version part
-	if (firstPart && /^v?\d+(\.\d+)?$/.test(firstPart) && parts.length > 1) {
-		for (let i = 1; i < parts.length; i++) {
-			const part = parts[i];
-			if (
-				part &&
-				!/^v?\d+(\.\d+)?$/.test(part) &&
-				!["latest", "preview", "rc", "beta", "alpha", "dev", "free"].includes(
-					part,
-				)
-			) {
-				return {
-					familyId: part,
-					familyName: part.charAt(0).toUpperCase() + part.slice(1),
-				};
-			}
-		}
+	// First non-version, non-skip part
+	const nonVersion = parts.find(
+		(p) => p && !VERSION_RE.test(p) && !SKIP_PARTS.has(p),
+	);
+	if (nonVersion) {
+		return { familyId: nonVersion, familyName: capitalize(nonVersion) };
 	}
 
 	return {
 		familyId: firstPart || id,
-		familyName:
-			(firstPart || id).charAt(0).toUpperCase() + (firstPart || id).slice(1),
+		familyName: capitalize(firstPart || id),
 	};
 }
 
@@ -233,48 +220,38 @@ export function normalizeModelName(name: string): string {
 }
 
 /**
- * Get all model families from a list of models.
- * Groups models by family and merges same-name models across providers.
+ * Try to merge a model into another family if its normalized name
+ * matches a model in a different family.
  */
-export function getModelFamilies(models: ModelInfo[]): ModelFamily[] {
-	const byFamily = new Map<string, ModelInfo[]>();
-	const nameToFamilyId = new Map<string, string>();
+function tryMergeFamily(
+	byFamily: Map<string, ModelInfo[]>,
+	nameToFamilyId: Map<string, string>,
+	familyId: string,
+	model: ModelInfo,
+): boolean {
+	const normalizedName = normalizeModelName(model.name || model.id);
+	if (!normalizedName) return false;
 
-	for (const model of models) {
-		const family = detectModelFamily(model);
-		if (!family) continue;
-
-		const existing = byFamily.get(family.familyId) ?? [];
-		existing.push(model);
-		byFamily.set(family.familyId, existing);
+	const existingFamilyForName = nameToFamilyId.get(normalizedName);
+	if (!existingFamilyForName || existingFamilyForName === familyId) {
+		nameToFamilyId.set(normalizedName, familyId);
+		return false;
 	}
 
-	// Second pass: merge families with models that have the same normalized name
-	const familyIds = [...byFamily.keys()];
-	for (const familyId of familyIds) {
-		const familyModels = byFamily.get(familyId);
-		if (!familyModels) continue;
+	// Same model name found in different family - merge them
+	const targetFamily = byFamily.get(existingFamilyForName);
+	const sourceFamily = byFamily.get(familyId);
+	if (!targetFamily || !sourceFamily) return false;
 
-		for (const model of familyModels) {
-			const normalizedName = normalizeModelName(model.name || model.id);
-			if (!normalizedName) continue;
+	targetFamily.push(...sourceFamily);
+	byFamily.delete(familyId);
+	return true;
+}
 
-			const existingFamilyForName = nameToFamilyId.get(normalizedName);
-			if (existingFamilyForName && existingFamilyForName !== familyId) {
-				// Same model name found in different family - merge them
-				const targetFamily = byFamily.get(existingFamilyForName);
-				const sourceFamily = byFamily.get(familyId);
-				if (targetFamily && sourceFamily) {
-					targetFamily.push(...sourceFamily);
-					byFamily.delete(familyId);
-					break;
-				}
-			} else {
-				nameToFamilyId.set(normalizedName, familyId);
-			}
-		}
-	}
-
+/**
+ * Build a sorted list of ModelFamily from a by-family grouping map.
+ */
+function buildFamiliesList(byFamily: Map<string, ModelInfo[]>): ModelFamily[] {
 	const families: ModelFamily[] = [];
 	for (const [id, familyModels] of byFamily) {
 		const firstModel = familyModels[0]!;
@@ -291,4 +268,38 @@ export function getModelFamilies(models: ModelInfo[]): ModelFamily[] {
 	}
 
 	return families.sort((a, b) => a.displayName.localeCompare(b.displayName));
+}
+
+/**
+ * Get all model families from a list of models.
+ * Groups models by family and merges same-name models across providers.
+ */
+export function getModelFamilies(models: ModelInfo[]): ModelFamily[] {
+	const byFamily = new Map<string, ModelInfo[]>();
+	const nameToFamilyId = new Map<string, string>();
+
+	// First pass: group models by detected family
+	for (const model of models) {
+		const family = detectModelFamily(model);
+		if (!family) continue;
+
+		const existing = byFamily.get(family.familyId) ?? [];
+		existing.push(model);
+		byFamily.set(family.familyId, existing);
+	}
+
+	// Second pass: merge families whose models have the same normalized name
+	const familyIds = [...byFamily.keys()];
+	for (const familyId of familyIds) {
+		const familyModels = byFamily.get(familyId);
+		if (!familyModels) continue;
+
+		for (const model of familyModels) {
+			if (tryMergeFamily(byFamily, nameToFamilyId, familyId, model)) {
+				break;
+			}
+		}
+	}
+
+	return buildFamiliesList(byFamily);
 }
