@@ -50,15 +50,20 @@ Free models are shown by default — look for the provider prefixes:
 - `kilo/` — Kilo models (free models available immediately, more after `/login kilo`)
 - `openrouter/` — OpenRouter models (free account required)
 - `cline/` — Cline models (run `/login cline` to use)
+- `llm7/` — LLM7 gateway models (free tier: default/fast selectors, 100 req/hr)
 
 **🔄 Freemium (free tier with limits, then paid):**
 
 - `nvidia/` — NVIDIA NIM models (1,000 free requests/month, then credits)
 - `ollama-cloud/` — Ollama Cloud models (usage-based free tier, resets every 5 hours + 7 days)
-  **💳 Paid Providers (API key with credits required):**
+- `sambanova/` — SambaNova Cloud models (20-480 RPM free, no credit card required)
+
+**💳 Paid Providers (API key with credits required):**
 
 - `zenmux/` — ZenMux AI gateway (200+ models from OpenAI, Anthropic, Google, etc.)
 - `crofai/` — CrofAI OpenAI-compatible API (streaming, reasoning models)
+- `codestral/` — Codestral via Mistral (free Experiment plan: 2 req/min, 1B tokens/month)
+- `deepinfra/` — DeepInfra inference cloud ($5 one-time trial credit, no credit card)
 
 > **Note:** Paid providers may occasionally offer free models or promotional credits. The `isFreeModel` helper automatically detects free models based on provider pricing data or model names containing "free". For providers that don't expose pricing (like CrofAI), only models with "free" in their names are marked as free.
 
@@ -90,6 +95,10 @@ Want to see paid models too? Run the toggle command for your provider:
 /toggle-huggingface # Toggle Hugging Face (🔧 dynamic - needs HF_TOKEN)
 /toggle-zenmux    # Toggle ZenMux (💳 paid - needs API key with credits)
 /toggle-crofai    # Toggle CrofAI (💳 paid - needs API key with credits)
+/toggle-codestral # Toggle Codestral (💳 paid - free Experiment plan)
+/toggle-deepinfra # Toggle DeepInfra (💳 trial credit provider)
+/toggle-sambanova # Toggle SambaNova (🔄 freemium)
+/toggle-llm7      # Toggle LLM7 (✅ free gateway)
 ```
 
 **Notes:**
@@ -115,11 +124,15 @@ Add your API keys to this file:
 
 ```json
 {
-  "openrouter_api_key": "sk-or-v1-...",
   "nvidia_api_key": "nvapi-...",
   "ollama_api_key": "...",
   "mistral_api_key": "...",
-  "modal_api_key": "sk-modal-..."
+  "codestral_api_key": "...",
+  "deepinfra_api_key": "...",
+  "sambanova_api_key": "...",
+  "llm7_api_key": "...",
+  "zenmux_api_key": "...",
+  "crofai_api_key": "..."
 }
 ```
 
@@ -134,6 +147,7 @@ See the [Providers That Need Authentication](#providers-that-need-authentication
 | Command              | What it does                                              |
 | -------------------- | --------------------------------------------------------- |
 | `/toggle-{provider}` | Switch between free-only and all models for that provider |
+| `/toggle-free`       | Toggle global free-only mode for ALL providers            |
 | `/free-providers`    | Show free/paid model counts for all providers             |
 | `/login kilo`        | Start OAuth flow for Kilo                                 |
 | `/login cline`       | Start OAuth flow for Cline                                |
@@ -193,7 +207,6 @@ Authentication is handled automatically:
 
 - **OAuth flows** — `/login kilo` and `/login cline` open your browser, wait for authorization, and complete automatically
 - **Multiple auth sources** — API keys read from `~/.pi/free.json`, environment variables, or standard Pi auth files (`~/.pi/agent/auth.json`)
-- **Smart fallbacks** — New env var names (e.g., `CF_API_TOKEN`) with legacy support (`CLOUDFLARE_API_TOKEN`)
 
 ---
 
@@ -266,15 +279,17 @@ Get a free API key at [openrouter.ai/keys](https://openrouter.ai/keys), then eit
 export OPENROUTER_API_KEY="sk-or-v1-..."
 ```
 
-**Option B: Config file** (`~/.pi/free.json`)
+**Option B: Pi's auth file** (`~/.pi/agent/auth.json`)
 
-```json
-{
-  "openrouter_api_key": "sk-or-v1-..."
-}
+OpenRouter reads its key from Pi's built-in auth storage. Set it via:
+
+```bash
+export OPENROUTER_API_KEY="sk-or-v1-..."
 ```
 
 Then use `/toggle-openrouter` to switch between free-only and all models.
+
+**Note:** `openrouter_api_key` in `~/.pi/free.json` is ignored. OpenRouter always reads from Pi's auth system to avoid stale keys.
 
 ### NVIDIA NIM (Free Credits System)
 
@@ -349,6 +364,67 @@ export MISTRAL_API_KEY="..."
 
 ---
 
+### 💳 Paid Providers
+
+### Codestral (free Experiment plan)
+
+Codestral is Mistral's code-focused model via `codestral.mistral.ai`:
+
+- Free tier (Experiment plan): 2 req/min, 500K tokens/min, 1B tokens/month
+- No credit card — phone verification only
+- Sign up at https://console.mistral.ai/codestral
+
+```bash
+export CODESTRAL_API_KEY="..."
+```
+
+Or add to `~/.pi/free.json`:
+
+```json
+{
+  "codestral_api_key": "YOUR_KEY"
+}
+```
+
+**Note:** Codestral uses Mistral's SDK (`mistral-conversations` API type), not OpenAI-completions.
+
+### LLM7.io (free gateway)
+
+LLM7 routes across multiple providers through a single OpenAI-compatible endpoint:
+
+- Free tier: default/fast selectors, 100 req/hr, 20 req/min
+- No credit card required
+- Get free token at https://token.llm7.io/
+
+```bash
+export LLM7_API_KEY="..."
+```
+
+### DeepInfra ($5 trial credit)
+
+AI inference cloud with 100+ open-source models:
+
+- $5 one-time credit on signup (no credit card)
+- ~5M tokens, expires after 90 days
+- 60 RPM (varies by model)
+
+```bash
+export DEEPINFRA_TOKEN="..."
+```
+
+### SambaNova Cloud (free tier)
+
+Fast inference on custom RDU hardware:
+
+- Free tier: 20-480 RPM, 400-9600 RPD (no credit card)
+- Models include Llama 3.3 70B, DeepSeek-V3/R1, Llama 4 Maverick
+
+```bash
+export SAMBANOVA_API_KEY="..."
+```
+
+---
+
 ## Slash Commands
 
 Each provider has toggle commands to switch between free and all models:
@@ -366,9 +442,12 @@ Each provider has toggle commands to switch between free and all models:
 | `/toggle-cerebras`    | Toggle between free/all Cerebras models (🔧 dynamic)     |
 | `/toggle-xai`         | Toggle between free/all xAI models (🔧 dynamic)          |
 | `/toggle-huggingface` | Toggle between free/all Hugging Face models (🔧 dynamic) |
-
-/toggle-zenmux # Toggle ZenMux (💳 paid - needs API key with credits)
-/toggle-crofai # Toggle CrofAI (💳 paid - needs API key with credits)
+| `/toggle-codestral`   | Toggle Codestral (💳 paid)                               |
+| `/toggle-deepinfra`   | Toggle DeepInfra (💳 trial credit)                       |
+| `/toggle-sambanova`   | Toggle SambaNova (🔄 freemium)                           |
+| `/toggle-llm7`        | Toggle LLM7 (✅ free gateway)                            |
+| `/toggle-zenmux`      | Toggle ZenMux (💳 paid)                                  |
+| `/toggle-crofai`      | Toggle CrofAI (💳 paid)                                  |
 
 **The toggle command:**
 
@@ -405,10 +484,8 @@ Create `~/.pi/free.json` in your home directory:
 
 ```json
 {
-  "openrouter_api_key": "YOUR_OPENROUTER_KEY",
   "nvidia_api_key": "YOUR_NVIDIA_KEY",
   "mistral_api_key": "YOUR_MISTRAL_KEY",
-  "opencode_api_key": "YOUR_OPENCODE_KEY",
   "ollama_api_key": "YOUR_OLLAMA_KEY",
   "ollama_show_paid": true,
   "hidden_models": ["model-id-to-hide"]
@@ -418,8 +495,8 @@ Create `~/.pi/free.json` in your home directory:
 Or use environment variables (same names, uppercase):
 
 ```bash
-export OPENROUTER_API_KEY="..."
 export NVIDIA_API_KEY="..."
+export MISTRAL_API_KEY="..."
 ```
 
 ---
@@ -465,7 +542,7 @@ timestamp|provider|modelId|modelName|action|strategy|normalizedId|matchKey|codin
 ```
 2026-04-26T10:30:00Z|nvidia|meta/llama-3.1-405b-instruct|Llama 3.1 405B|match|provider-normalized:strip-nvidia-prefix|llama-3.1-405b-instruct|llama-3.1-instruct-405b|52.3|
 2026-04-26T10:30:01Z|groq|llama-3.1-70b-versatile|Llama 3.1 70B Versatile|match|strip-groq-versatile|llama-3.1-70b|llama-3.1-instruct-70b|48.5|
-2026-04-26T10:30:02Z|cloudflare|@cf/meta/llama-3.1-70b|Llama 3.1 70B|miss|all-strategies-failed|llama-3.1-70b|||
+2026-04-26T10:30:02Z|groq|mixtral-8x7b-instruct|Mixtral 8x7B|miss|all-strategies-failed|mixtral-8x7b-instruct|||
 ```
 
 **Common mismatch patterns:**
