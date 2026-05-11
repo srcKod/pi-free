@@ -64,6 +64,7 @@ Free models are shown by default — look for the provider prefixes:
 - `crofai/` — CrofAI OpenAI-compatible API (streaming, reasoning models)
 - `codestral/` — Codestral via Mistral (free Experiment plan: 2 req/min, 1B tokens/month)
 - `deepinfra/` — DeepInfra inference cloud ($5 one-time trial credit, no credit card)
+- `novita/` — Novita AI (100+ open-source models, OpenAI-compatible, 3 free models)
 
 > **Note:** Paid providers may occasionally offer free models or promotional credits. The `isFreeModel` helper automatically detects free models based on provider pricing data or model names containing "free". For providers that don't expose pricing (like CrofAI), only models with "free" in their names are marked as free.
 
@@ -74,6 +75,9 @@ Free models are shown by default — look for the provider prefixes:
 - `cerebras/` — Cerebras models (when `CEREBRAS_API_KEY` set)
 - `xai/` — xAI models (when `XAI_API_KEY` set)
 - `huggingface/` — Hugging Face models (when `HF_TOKEN` set)
+- `opencode/` — OpenCode models (fetched from opencode.ai/zen/v1, when `OPENCODE_API_KEY` set)
+- `openrouter/` — OpenRouter models (fetched from openrouter.ai, when `OPENROUTER_API_KEY` set)
+- `fastrouter/` — FastRouter models (always discovered, 170+ models, no auth for listing)
 
 **Note:** Fireworks is now a [built-in Pi provider](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/CHANGELOG.md#0681---2026-04-22) — no extension needed. Set `FIREWORKS_API_KEY` to use it directly.
 
@@ -100,6 +104,8 @@ Want to see paid models too? Run the toggle command for your provider:
 /toggle-together  # Toggle Together AI (💳 trial credit provider)
 /toggle-sambanova # Toggle SambaNova (🔄 freemium)
 /toggle-llm7      # Toggle LLM7 (✅ free gateway)
+/toggle-novita    # Toggle Novita AI (💳 paid — 3 free models)
+/toggle-fastrouter # Toggle FastRouter (🔧 dynamic — always discovered)
 ```
 
 **Notes:**
@@ -442,28 +448,28 @@ export SAMBANOVA_API_KEY="..."
 
 Each provider has toggle commands to switch between free and all models:
 
-| Command               | Action                                                   |
-| --------------------- | -------------------------------------------------------- |
-| `/toggle-opencode`    | Toggle between free/all OpenCode models                  |
-| `/toggle-kilo`        | Toggle between free/all Kilo models                      |
-| `/toggle-openrouter`  | Toggle between free/all OpenRouter models                |
-| `/toggle-cline`       | Toggle between free/all Cline models                     |
-| `/toggle-nvidia`      | Toggle between free/all NVIDIA models                    |
-| `/toggle-ollama`      | Toggle between free/all Ollama Cloud models              |
-| `/toggle-mistral`     | Toggle between free/all Mistral models (🔧 dynamic)      |
-| `/toggle-groq`        | Toggle between free/all Groq models (🔧 dynamic)         |
-| `/toggle-cerebras`    | Toggle between free/all Cerebras models (🔧 dynamic)     |
-| `/toggle-xai`         | Toggle between free/all xAI models (🔧 dynamic)          |
-| `/toggle-huggingface` | Toggle between free/all Hugging Face models (🔧 dynamic) |
-| `/toggle-codestral`   | Toggle Codestral (💳 paid)                               |
-| `/toggle-deepinfra`   | Toggle DeepInfra (💳 trial credit)                       |
-| `/toggle-together`    | Toggle Together AI (💳 trial credit)                     |
-| `/toggle-sambanova`   | Toggle SambaNova (🔄 freemium)                           |
-| `/toggle-llm7`        | Toggle LLM7 (✅ free gateway)                            |
-| `/toggle-zenmux`      | Toggle ZenMux (💳 paid)                                  |
-| `/toggle-crofai`      | Toggle CrofAI (💳 paid)                                  |
-| `/ollama-cloud-refresh` | Re-fetch Ollama Cloud models live (no restart needed)  |
-| `/probe-ollama`       | Test Ollama Cloud models for 403 errors (auto-hide)      |
+| Command                 | Action                                                   |
+| ----------------------- | -------------------------------------------------------- |
+| `/toggle-opencode`      | Toggle between free/all OpenCode models                  |
+| `/toggle-kilo`          | Toggle between free/all Kilo models                      |
+| `/toggle-openrouter`    | Toggle between free/all OpenRouter models                |
+| `/toggle-cline`         | Toggle between free/all Cline models                     |
+| `/toggle-nvidia`        | Toggle between free/all NVIDIA models                    |
+| `/toggle-ollama`        | Toggle between free/all Ollama Cloud models              |
+| `/toggle-mistral`       | Toggle between free/all Mistral models (🔧 dynamic)      |
+| `/toggle-groq`          | Toggle between free/all Groq models (🔧 dynamic)         |
+| `/toggle-cerebras`      | Toggle between free/all Cerebras models (🔧 dynamic)     |
+| `/toggle-xai`           | Toggle between free/all xAI models (🔧 dynamic)          |
+| `/toggle-huggingface`   | Toggle between free/all Hugging Face models (🔧 dynamic) |
+| `/toggle-codestral`     | Toggle Codestral (💳 paid)                               |
+| `/toggle-deepinfra`     | Toggle DeepInfra (💳 trial credit)                       |
+| `/toggle-together`      | Toggle Together AI (💳 trial credit)                     |
+| `/toggle-sambanova`     | Toggle SambaNova (🔄 freemium)                           |
+| `/toggle-llm7`          | Toggle LLM7 (✅ free gateway)                            |
+| `/toggle-zenmux`        | Toggle ZenMux (💳 paid)                                  |
+| `/toggle-crofai`        | Toggle CrofAI (💳 paid)                                  |
+| `/ollama-cloud-refresh` | Re-fetch Ollama Cloud models live (no restart needed)    |
+| `/probe-ollama`         | Test Ollama Cloud models for 403 errors (auto-hide)      |
 
 **The toggle command:**
 

@@ -32,6 +32,8 @@ interface PiFreeConfig {
 	deepinfra_api_key?: string;
 	sambanova_api_key?: string;
 	together_api_key?: string;
+	novita_api_key?: string;
+	fastrouter_api_key?: string;
 	kilo_free_only?: boolean;
 	hidden_models?: string[];
 	free_only?: boolean;
@@ -45,6 +47,8 @@ interface PiFreeConfig {
 	deepinfra_show_paid?: boolean;
 	sambanova_show_paid?: boolean;
 	together_show_paid?: boolean;
+	novita_show_paid?: boolean;
+	fastrouter_show_paid?: boolean;
 	openrouter_show_paid?: boolean;
 	opencode_show_paid?: boolean;
 }
@@ -59,6 +63,8 @@ const CONFIG_TEMPLATE: PiFreeConfig = {
 	deepinfra_api_key: "",
 	sambanova_api_key: "",
 	together_api_key: "",
+	novita_api_key: "",
+	fastrouter_api_key: "",
 
 	kilo_free_only: false,
 	hidden_models: [],
@@ -73,6 +79,8 @@ const CONFIG_TEMPLATE: PiFreeConfig = {
 	deepinfra_show_paid: false,
 	sambanova_show_paid: false,
 	together_show_paid: false,
+	novita_show_paid: false,
+	fastrouter_show_paid: false,
 	openrouter_show_paid: false,
 	opencode_show_paid: false,
 };
@@ -210,6 +218,17 @@ export function getTogetherShowPaid(): boolean {
 	return resolveBool("TOGETHER_SHOW_PAID", loadConfigFile().together_show_paid);
 }
 
+export function getNovitaShowPaid(): boolean {
+	return resolveBool("NOVITA_SHOW_PAID", loadConfigFile().novita_show_paid);
+}
+
+export function getFastrouterShowPaid(): boolean {
+	return resolveBool(
+		"FASTROUTER_SHOW_PAID",
+		loadConfigFile().fastrouter_show_paid,
+	);
+}
+
 export function getOllamaShowPaid(): boolean {
 	return resolveBool("OLLAMA_SHOW_PAID", loadConfigFile().ollama_show_paid);
 }
@@ -271,6 +290,14 @@ export function getSambanovaApiKey(): string | undefined {
 
 export function getTogetherApiKey(): string | undefined {
 	return resolve("TOGETHER_AI_API_KEY", loadConfigFile().together_api_key);
+}
+
+export function getNovitaApiKey(): string | undefined {
+	return resolve("NOVITA_API_KEY", loadConfigFile().novita_api_key);
+}
+
+export function getFastrouterApiKey(): string | undefined {
+	return resolve("FASTROUTER_API_KEY", loadConfigFile().fastrouter_api_key);
 }
 
 export function getOllamaApiKey(): string | undefined {
