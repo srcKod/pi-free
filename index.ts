@@ -58,7 +58,7 @@ function setupGlobalCommands(pi: ExtensionAPI) {
 		handler: async (_args, ctx) => {
 			const current = getGlobalFreeOnly();
 			const next = !current;
-			applyGlobalFilter(pi, next);
+			applyGlobalFilter(pi, next, { force: true });
 
 			const registry = getProviderRegistry();
 			const providerCount = registry.size;
@@ -214,8 +214,8 @@ export default async function piFreeEntry(pi: ExtensionAPI) {
 		novita(pi),
 	]);
 
-	// Setup dynamic built-in providers (Mistral, Groq, Cerebras, xAI, Hugging Face)
-	// These only activate if the user has configured API keys (OpenRouter works without key too)
+	// Setup dynamic built-in providers (Mistral, Groq, Cerebras, xAI, Hugging Face,
+	// OpenRouter/OpenCode from Pi auth, and FastRouter public model discovery)
 	const { setupDynamicBuiltInProviders } = await import(
 		"./providers/dynamic-built-in/index.ts"
 	);

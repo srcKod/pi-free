@@ -5,9 +5,9 @@
  * standard /models endpoints when the user has configured an API key.
  *
  * Uses a single generic fetch function instead of per-provider boilerplate.
- * Discovery runs concurrently with 1s timeout per provider, fire-and-forget
- * so extension init never blocks. Pi's built-in defaults serve until
- * discovery completes and replaces them.
+ * Discovery runs concurrently and is awaited by the extension entry point.
+ * Pi only flushes provider registrations after async extension startup, so
+ * dynamic providers must register before setup returns.
  *
  * Providers handled:
  * - mistral (MISTRAL_API_KEY)
@@ -29,13 +29,17 @@ import type {
 import {
 	getCerebrasApiKey,
 	getFastrouterApiKey,
+	getFastrouterShowPaid,
 	getGroqApiKey,
 	getHfToken,
 	getMistralApiKey,
 	getOpencodeApiKey,
+	getOpencodeShowPaid,
 	getOpenrouterApiKey,
+	getOpenrouterShowPaid,
 	getXaiApiKey,
 } from "../../config.ts";
+import { DEFAULT_FETCH_TIMEOUT_MS } from "../../constants.ts";
 import { createLogger } from "../../lib/logger.ts";
 import { getProxyModelCompat } from "../../lib/provider-compat.ts";
 import { isFreeModel, registerWithGlobalToggle } from "../../lib/registry.ts";
@@ -75,7 +79,7 @@ async function fetchModelsFromEndpoint(
 
 	const response = await fetch(url, {
 		headers,
-		signal: AbortSignal.timeout(opts.timeoutMs ?? 1_000),
+		signal: AbortSignal.timeout(opts.timeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS),
 	});
 
 	if (!response.ok) {
@@ -131,7 +135,7 @@ async function fetchHuggingFaceModels(
 
 	const response = await fetch(
 		"https://api-inference.huggingface.co/models?pipeline_tag=text-generation&limit=50",
-		{ headers, signal: AbortSignal.timeout(1_000) },
+		{ headers, signal: AbortSignal.timeout(DEFAULT_FETCH_TIMEOUT_MS) },
 	);
 
 	if (!response.ok) {
@@ -167,7 +171,7 @@ interface DynamicProviderDef {
 	getApiKey: () => string | undefined;
 	baseUrl: string;
 	api: "openai-completions" | "mistral-conversations" | "anthropic-messages";
-	defaultShowPaid: boolean;
+	defaultShowPaid: boolean | (() => boolean);
 	/** Optional per-provider compat overrides (e.g., DeepSeek proxy). */
 	compat?: ProviderModelConfig["compat"];
 	/** Per-model field defaults when the API doesn't expose them. */
@@ -214,7 +218,7 @@ const DYNAMIC_PROVIDERS: DynamicProviderDef[] = [
 		getApiKey: getOpencodeApiKey,
 		baseUrl: "https://opencode.ai/zen/v1",
 		api: "openai-completions",
-		defaultShowPaid: false,
+		defaultShowPaid: getOpencodeShowPaid,
 		// OpenCode API returns no pricing — _pricingKnown=false, name-based detection
 	},
 	{
@@ -222,7 +226,7 @@ const DYNAMIC_PROVIDERS: DynamicProviderDef[] = [
 		getApiKey: getOpenrouterApiKey,
 		baseUrl: "https://openrouter.ai/api/v1",
 		api: "openai-completions",
-		defaultShowPaid: false,
+		defaultShowPaid: getOpenrouterShowPaid,
 		// OpenRouter returns full pricing — use its dedicated fetcher
 		fetchModels: (apiKey) =>
 			fetchOpenRouterCompatibleModels({
@@ -253,7 +257,7 @@ async function discoverAndRegister(
 				apiKey,
 				compat: config.compat,
 				modelDefaults: config.modelDefaults,
-				timeoutMs: 1_000,
+				timeoutMs: DEFAULT_FETCH_TIMEOUT_MS,
 			});
 		}
 
@@ -262,9 +266,10 @@ async function discoverAndRegister(
 			...m,
 			compat: getProxyModelCompat(m) ?? m.compat,
 		}));
-	} catch {
+	} catch (error) {
 		_logger.info(
 			`[dynamic] ${config.providerId}: discovery failed, Pi keeps its defaults`,
+			{ error: error instanceof Error ? error.message : String(error) },
 		);
 		return;
 	}
@@ -287,9 +292,10 @@ async function discoverAndRegisterHF(
 	let allModels: ProviderModelConfig[];
 	try {
 		allModels = await fetchHuggingFaceModels(apiKey);
-	} catch {
+	} catch (error) {
 		_logger.info(
 			"[dynamic] huggingface: discovery failed, Pi keeps its defaults",
+			{ error: error instanceof Error ? error.message : String(error) },
 		);
 		return;
 	}
@@ -328,7 +334,10 @@ async function registerProvider(
 	// Toggle state
 	const toggleState = createToggleState({
 		providerId: config.providerId,
-		initialShowPaid: config.defaultShowPaid,
+		initialShowPaid:
+			typeof config.defaultShowPaid === "function"
+				? config.defaultShowPaid()
+				: config.defaultShowPaid,
 		initialModels: { free: freeModels, all: allModels },
 	});
 
@@ -380,16 +389,18 @@ async function registerProvider(
 }
 
 // =============================================================================
-// Main Entry — Fire-and-Forget
+// Main Entry
 // =============================================================================
 
 /**
  * Kick off model discovery for all configured providers.
- * Runs each fetch concurrently with a 1s timeout so the worst-case
- * wall time is ~1s, not `n * 1s`. Extension init never blocks.
+ * Runs each fetch concurrently so startup waits for the slowest provider,
+ * not `n * provider latency`.
  *
- * Pi's built-in defaults serve until discovery completes and this
- * function replaces them via pi.registerProvider().
+ * Pi flushes provider registrations after async extension startup completes,
+ * so this function must await discovery before returning. Otherwise late
+ * pi.registerProvider() calls may not be visible to startup flows such as
+ * `pi --list-models` or the initial model picker.
  */
 export async function setupDynamicBuiltInProviders(
 	pi: ExtensionAPI,
@@ -417,7 +428,7 @@ export async function setupDynamicBuiltInProviders(
 				getApiKey: getFastrouterApiKey,
 				baseUrl: "https://api.fastrouter.ai/api/v1",
 				api: "openai-completions",
-				defaultShowPaid: false,
+				defaultShowPaid: getFastrouterShowPaid,
 				fetchModels: () =>
 					fetchOpenRouterCompatibleModels({
 						baseUrl: "https://api.fastrouter.ai/api/v1",
@@ -431,15 +442,13 @@ export async function setupDynamicBuiltInProviders(
 	if (fetchers.length === 0) return;
 
 	_logger.info(
-		`[dynamic] Kicking off discovery for ${fetchers.length} providers (1s timeout each, concurrent)...`,
+		`[dynamic] Kicking off discovery for ${fetchers.length} providers (concurrent)...`,
 	);
 
-	// Fire-and-forget: log results, never block init
-	void Promise.allSettled(fetchers).then((results) => {
-		const succeeded = results.filter((r) => r.status === "fulfilled").length;
-		const failed = results.filter((r) => r.status === "rejected").length;
-		_logger.info(
-			`[dynamic] Discovery complete: ${succeeded} succeeded, ${failed} failed/rejected`,
-		);
-	});
+	const results = await Promise.allSettled(fetchers);
+	const succeeded = results.filter((r) => r.status === "fulfilled").length;
+	const failed = results.filter((r) => r.status === "rejected").length;
+	_logger.info(
+		`[dynamic] Discovery complete: ${succeeded} succeeded, ${failed} failed/rejected`,
+	);
 }

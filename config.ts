@@ -244,6 +244,41 @@ export function getOpencodeShowPaid(): boolean {
 	return resolveBool("OPENCODE_SHOW_PAID", loadConfigFile().opencode_show_paid);
 }
 
+export function getProviderShowPaid(providerId: string): boolean {
+	switch (providerId) {
+		case "kilo":
+			return getKiloShowPaid();
+		case "cline":
+			return getClineShowPaid();
+		case "zenmux":
+			return getZenmuxShowPaid();
+		case "crofai":
+			return getCrofaiShowPaid();
+		case "codestral":
+			return getCodestralShowPaid();
+		case "llm7":
+			return getLlm7ShowPaid();
+		case "deepinfra":
+			return getDeepinfraShowPaid();
+		case "sambanova":
+			return getSambanovaShowPaid();
+		case "together":
+			return getTogetherShowPaid();
+		case "novita":
+			return getNovitaShowPaid();
+		case "fastrouter":
+			return getFastrouterShowPaid();
+		case "ollama-cloud":
+			return getOllamaShowPaid();
+		case "openrouter":
+			return getOpenrouterShowPaid();
+		case "opencode":
+			return getOpencodeShowPaid();
+		default:
+			return false;
+	}
+}
+
 // =============================================================================
 // Global free-only mode
 // =============================================================================
