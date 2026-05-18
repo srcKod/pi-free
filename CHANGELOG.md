@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **OpenCode static headers injection** — pi-free now injects required OpenCode headers (`x-opencode-client`, `x-opencode-session`, `x-opencode-request`, `x-opencode-project`, `User-Agent`) when capturing and re-registering pi's built-in OpenCode models. Prevents requests from hanging indefinitely when pi's model generation omits these headers ([pi#4680](https://github.com/earendil-works/pi/issues/4680)). Uses the existing (formerly unused) `createOpenCodeSessionTracker` for dynamic per-session UUIDs and per-model request IDs.
+
+## [2.0.12] - 2026-05-13
+
+### Added
+
 - **Novita AI provider** — OpenAI-compatible API at `api.novita.ai/openai/v1` with 100+ open-source models. Non-standard but rich metadata: per-model pricing (`input_token_price_per_m`), context size, max output tokens, reasoning/vision features, and model descriptions. 3 free models, 99 paid.
 
 - **FastRouter provider** — OpenRouter-compatible API at `api.fastrouter.ai/api/v1` with 170+ models. Always discovered (no auth needed for model listing). Full pricing, context lengths, and feature metadata. 129 text models (6 free, 123 paid) after filtering image/video. Set `FASTROUTER_API_KEY` for chat completions.
