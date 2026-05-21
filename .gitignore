@@ -3,6 +3,7 @@ node_modules/
 .pisessionsummaries/
 .pi-lens/
 *.log
+.pi/greedysearch-sources/
 .DS_Store
 dist/
 *.tsbuildinfo
