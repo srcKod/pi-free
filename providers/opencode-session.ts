@@ -71,8 +71,16 @@ export function isOpenCodeProvider(providerId: string): boolean {
 	return providerId === "opencode" || providerId === "opencode-go";
 }
 
+function stripTrailingSlashes(value: string): string {
+	let end = value.length;
+	while (end > 0 && value.charCodeAt(end - 1) === 47) {
+		end--;
+	}
+	return value.slice(0, end);
+}
+
 function isAnthropicOpenCodeEndpoint(model: Model<Api>): boolean {
-	return !model.baseUrl.replace(/\/+$/, "").endsWith("/v1");
+	return !stripTrailingSlashes(model.baseUrl).endsWith("/v1");
 }
 
 type StreamSimpleFn<TApi extends Api> = (
