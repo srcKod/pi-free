@@ -1,3 +1,5 @@
+import { existsSync, lstatSync, readFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
@@ -73,7 +75,7 @@ export function isOpenCodeProvider(providerId: string): boolean {
 
 function stripTrailingSlashes(value: string): string {
 	let end = value.length;
-	while (end > 0 && value.charCodeAt(end - 1) === 47) {
+	while (end > 0 && value.codePointAt(end - 1) === 47) {
 		end--;
 	}
 	return value.slice(0, end);
@@ -113,7 +115,7 @@ async function importPiAiSubpathUncached<T>(specifier: string): Promise<T> {
 	try {
 		return (await import(specifier)) as T;
 	} catch (directError) {
-		const resolved = resolvePiAiFromPiEntrypoint(specifier);
+		const resolved = resolvePiAiSubpathFromPackage(specifier);
 		if (!resolved) throw directError;
 		try {
 			return (await import(pathToFileURL(resolved).href)) as T;
@@ -123,14 +125,47 @@ async function importPiAiSubpathUncached<T>(specifier: string): Promise<T> {
 	}
 }
 
-function resolvePiAiFromPiEntrypoint(specifier: string): string | undefined {
+const PI_AI_DEPENDENCY_CANARY = "openai";
+
+function findPiAiPackageDir(requireBase: string): string | undefined {
+	try {
+		const require = createRequire(requireBase);
+		const resolved = require.resolve(PI_AI_DEPENDENCY_CANARY);
+		let dir = dirname(resolved);
+		while (dir !== dirname(dir)) {
+			if (basename(dir) === "node_modules") {
+				const piAiDir = join(dir, "@earendil-works", "pi-ai");
+				const pkgJsonPath = join(piAiDir, "package.json");
+				if (existsSync(pkgJsonPath) && lstatSync(pkgJsonPath).isFile()) {
+					return piAiDir;
+				}
+			}
+			dir = dirname(dir);
+		}
+	} catch {
+		// Resolution failed — try the next base.
+	}
+	return undefined;
+}
+
+function resolvePiAiSubpathFromPackage(specifier: string): string | undefined {
+	const subpath = specifier.replace("@earendil-works/pi-ai/", "");
 	const candidates = [process.argv[1], import.meta.url].filter(
 		(value): value is string => Boolean(value),
 	);
 
 	for (const candidate of candidates) {
+		const pkgDir = findPiAiPackageDir(candidate);
+		if (!pkgDir) continue;
 		try {
-			return createRequire(candidate).resolve(specifier);
+			const pkg = JSON.parse(
+				readFileSync(join(pkgDir, "package.json"), "utf-8"),
+			);
+			const exportEntry = pkg.exports?.[`./${subpath}`];
+			const targetPath = exportEntry?.import ?? exportEntry?.default;
+			if (typeof targetPath === "string") {
+				return join(pkgDir, targetPath);
+			}
 		} catch {
 			// Try the next resolution base.
 		}
