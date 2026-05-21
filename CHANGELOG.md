@@ -7,9 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.13] - 2026-05-21
+
 ### Added
 
-- **OpenCode static headers injection** — pi-free now injects required OpenCode headers (`x-opencode-client`, `x-opencode-session`, `x-opencode-request`, `x-opencode-project`, `User-Agent`) when capturing/re-registering pi's built-in OpenCode models **and** when dynamically fetching/registering OpenCode models from `opencode.ai/zen/v1`. Prevents requests from hanging indefinitely when pi's model generation omits these headers ([pi#4680](https://github.com/earendil-works/pi/issues/4680), [#173](https://github.com/apmantza/pi-free/issues/173)). Uses the existing (formerly unused) `createOpenCodeSessionTracker` for dynamic per-session UUIDs and per-model request IDs.
+- **OpenCode static headers injection** — pi-free now injects required OpenCode headers (`x-opencode-client`, `x-opencode-session`, `x-opencode-request`, `x-opencode-project`, `User-Agent`) when capturing/re-registering pi's built-in OpenCode models **and** when dynamically fetching/registering OpenCode models from `opencode.ai/zen/v1`. Prevents requests from hanging indefinitely when pi's model generation omits these headers ([pi#4680](https://github.com/earendil-works/pi/issues/4680), [#171](https://github.com/apmantza/pi-free/issues/171), [#173](https://github.com/apmantza/pi-free/issues/173), [#174](https://github.com/apmantza/pi-free/issues/174)). Headers are now regenerated per-call with fresh session and request IDs. Uses native `ses_`/`msg_` prefixed ULID identifiers matching OpenCode's `Identifier.descending()` format to avoid daily rate-limit throttling ([#175](https://github.com/apmantza/pi-free/issues/175)).
+
+- **OpenCode endpoint detection** — Replaced regex-based OpenCode endpoint check with a simple string comparison, reducing overhead on every streaming request.
+
+### Fixed
+
+- **Lazy-load Pi AI stream providers** — Pi-ai's OpenAI completions and Anthropic stream modules are now imported lazily on first use rather than at extension load time. Eliminates start-up failures when pi-ai exports are not yet resolvable ([#177](https://github.com/apmantza/pi-free/issues/177)).
+
+- **Subpath resolution for isolated extension context** — Pi loads pi-free from a directory tree that does not contain `@earendil-works/pi-ai` in its `node_modules`. `createRequire().resolve()` only understands CJS resolution, but pi-ai is ESM-only with strict exports. The new fallback resolves a pi-ai dependency from Pi's entry point, walks up to `node_modules`, reads `pi-ai/package.json`, and maps the `exports` field to the actual file path. Fixes module resolution for both `anthropic` and `openai-completions` subpaths. Includes integration test.
+
+- **Security: shell injection in test** — Replaced `execSync` with `execFileSync` in the OpenCode session integration test to avoid shell injection risk.
+
+### Security
+
+- **Bump `brace-expansion` 5.0.5 → 5.0.6** — Patches minor dependency vulnerability. Fixes `npm audit`. ([#172](https://github.com/apmantza/pi-free/issues/172))
 
 ## [2.0.12] - 2026-05-13
 

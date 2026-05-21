@@ -20,7 +20,7 @@ When you install pi-free, it:
 
 3. **Filters to show only free models by default** for providers that expose pricing — You see only the models that cost $0 to use. Paid models are hidden until you explicitly toggle them on.
 
-4. **Provides per-provider toggle commands** — Run `/toggle-{provider}` (e.g., `/toggle-kilo`, `/toggle-opencode`) to switch between free-only mode and showing all models including paid ones. Changes apply immediately and your preference is saved for the next Pi restart.
+4. **Provides per-provider toggle commands** — Run `/toggle-{provider}` (e.g., `/toggle-kilo`) to switch between free-only mode and showing all models including paid ones. Changes apply immediately and your preference is saved for the next Pi restart.
 
 5. **Handles authentication for you** — OAuth flows (Kilo, Cline) open your browser automatically; API keys are read from `~/.pi/free.json` or environment variables
 
@@ -46,7 +46,6 @@ Free models are shown by default — look for the provider prefixes:
 
 **✅ Free Models (no payment required):**
 
-- `opencode/` — OpenCode models (no setup required; toggle with `/toggle-opencode`)
 - `kilo/` — Kilo models (free models available immediately, more after `/login kilo`)
 - `openrouter/` — OpenRouter models (free account required)
 - `cline/` — Cline models (run `/login cline` to use)
@@ -75,7 +74,6 @@ Free models are shown by default — look for the provider prefixes:
 - `cerebras/` — Cerebras models (when `CEREBRAS_API_KEY` set)
 - `xai/` — xAI models (when `XAI_API_KEY` set)
 - `huggingface/` — Hugging Face models (when `HF_TOKEN` set)
-- `opencode/` — OpenCode models (fetched from opencode.ai/zen/v1, when `OPENCODE_API_KEY` set)
 - `openrouter/` — OpenRouter models (fetched from openrouter.ai, when `OPENROUTER_API_KEY` set)
 - `fastrouter/` — FastRouter models (always discovered, 170+ models, no auth for listing)
 
@@ -86,7 +84,6 @@ Free models are shown by default — look for the provider prefixes:
 Want to see paid models too? Run the toggle command for your provider:
 
 ```
-/toggle-opencode   # Toggle OpenCode (✅ offers free models)
 /toggle-kilo       # Toggle Kilo (✅ offers free models)
 /toggle-openrouter # Toggle OpenRouter (✅ offers free models)
 /toggle-cline      # Toggle Cline (✅ offers free models)
@@ -113,10 +110,6 @@ Want to see paid models too? Run the toggle command for your provider:
 - **Toggle commands are mainly for ✅ and 🔄 providers** — to switch between "free models only" vs "show paid models too"
 - **🔧 Dynamic providers** show all fetched models by default — the toggle filters the list when you have an API key configured
 - **Freemium providers** show all models by default; you manage your usage limits via their dashboards
-
-You'll see a notification like: `opencode: showing free models` or `opencode: showing all models`
-
-**Note:** Built-in provider toggles such as OpenCode and OpenRouter update in the current session — no restart needed.
 
 ### 4. Add API keys for more providers (optional)
 
@@ -204,7 +197,7 @@ Providers have different pricing models. pi-free handles them all:
 
 **Provider types:**
 
-- ✅ **Free providers** (OpenCode, Kilo, Cline) — Toggle between free-only vs paid models
+- ✅ **Free providers** (Kilo, Cline) — Toggle between free-only vs paid models
 - 🔄 **Freemium** (NVIDIA, Ollama) — Free tier with limits, toggle shows all
 - 🔧 **Dynamic API** (Mistral, Groq, Cerebras, xAI) — Fetched when API key configured, toggle filters the list
 
@@ -218,17 +211,6 @@ Authentication is handled automatically:
 ---
 
 ## Using Free Models (No Setup Required)
-
-### OpenCode
-
-Works immediately with zero setup:
-
-1. Press `Ctrl+L`
-2. Search for `opencode/`
-3. Pick any model (e.g., `opencode/big-pickle`)
-4. Start chatting
-
-No account, no API key, no OAuth. Run `/toggle-opencode` to switch between free and paid OpenCode models.
 
 ### Kilo (free models, more after login)
 
@@ -450,7 +432,6 @@ Each provider has toggle commands to switch between free and all models:
 
 | Command                 | Action                                                   |
 | ----------------------- | -------------------------------------------------------- |
-| `/toggle-opencode`      | Toggle between free/all OpenCode models                  |
 | `/toggle-kilo`          | Toggle between free/all Kilo models                      |
 | `/toggle-openrouter`    | Toggle between free/all OpenRouter models                |
 | `/toggle-cline`         | Toggle between free/all Cline models                     |
@@ -477,7 +458,7 @@ Each provider has toggle commands to switch between free and all models:
 - **For 🔄 freemium providers**: Shows all models by default; toggle switches between filtered and full list
 - **For 🔧 dynamic API providers**: Filters the model list when you have an API key configured
 - **Persists your preference** to `~/.pi/free.json` for next startup
-- Shows a notification: "opencode: showing free models" or "opencode: showing all models"
+
 
 ### Probe Commands (Health Check)
 
