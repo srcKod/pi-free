@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -138,7 +138,7 @@ ${testScript}
 
 		// Use process.execPath so we don't rely on PATH resolution from the
 		// writable temp directory (SonarCloud security hotspot).
-		const output = execSync(`${JSON.stringify(process.execPath)} test.mjs`, {
+		const output = execFileSync(process.execPath, ["test.mjs"], {
 			cwd: tempDir,
 			encoding: "utf-8",
 		});
