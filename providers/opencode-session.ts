@@ -1,6 +1,6 @@
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { randomUUID } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import type {
@@ -22,29 +22,53 @@ export const OPENCODE_STATIC_HEADERS = {
 } as const;
 
 /**
+ * OpenCode-native identifier generation.
+ *
+ * OpenCode's server uses checkHeaders to distinguish native CLI requests from
+ * third-party clients.  Native identifiers use ULID-style prefixes:
+ *
+ *   Session:  ses_<hex><base62>   (e.g. ses_a1b2c3d4e5f6g7h8i9j0k1l2m3n4)
+ *   Request:  msg_<hex><base62>   (e.g. msg_01KA1B2C3D4E5F6G7H8I9J0K1L2M)
+ *
+ * If the server does not see the expected prefix it applies a fallback rate
+ * limit (~2 req/day) which causes models to "freeze" after a few prompts.
+ */
+function generateOpenCodeId(prefix: string): string {
+	// Timestamp in ms as big-endian hex (matches ULID-style sortability).
+	const ms = BigInt(Date.now());
+	const timeHex = ms.toString(16).padStart(12, "0");
+	// Random suffix (crypto) encoded as base62 for compactness.
+	const randomLen = 14;
+	const base62Chars =
+		"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+	const bytes = randomBytes(randomLen);
+	let suffix = "";
+	for (let i = 0; i < randomLen; i++) {
+		suffix += base62Chars[bytes[i] % 62];
+	}
+	return `${prefix}${timeHex}${suffix}`;
+}
+
+/**
  * Shared OpenCode session/request tracking.
  *
- * OpenCode endpoints appear to behave more reliably when a stable session id
- * is included across requests in the same Pi session.
+ * OpenCode endpoints require native-format identifiers (ses_ / msg_ prefix)
+ * to receive the full daily rate limit.  Without matching prefixes the server
+ * falls back to a ~2 req/day limit, causing free models to freeze after a
+ * couple of prompts.
  */
 export function createOpenCodeSessionTracker() {
 	let sessionId = "";
-	let requestCount = 0;
-
-	function generateId(): string {
-		return randomUUID().replaceAll("-", "");
-	}
 
 	function getSessionId(): string {
 		if (!sessionId) {
-			sessionId = generateId();
+			sessionId = generateOpenCodeId("ses_");
 		}
 		return sessionId;
 	}
 
 	function nextRequestId(): string {
-		requestCount++;
-		return `${getSessionId()}-${requestCount}`;
+		return generateOpenCodeId("msg_");
 	}
 
 	return {
