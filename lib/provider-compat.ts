@@ -24,6 +24,9 @@ export function isLikelyReasoningModel(model: ProviderModelIdentity): boolean {
 	return (
 		isDeepSeekModel(model) ||
 		haystack.includes("minimax") ||
+		haystack.includes("kimi") ||
+		haystack.includes("qwen3.7") ||
+		haystack.includes("qwen3-7") ||
 		haystack.includes("thinking") ||
 		haystack.includes("reasoning") ||
 		haystack.includes("reasoner") ||
@@ -49,6 +52,24 @@ export function getProxyModelCompat(
 			supportsStore: false,
 			supportsDeveloperRole: false,
 			supportsReasoningEffort: true,
+		};
+	}
+
+	// Qwen 3.7+ on OpenRouter/Cline uses reasoning_content (DeepSeek format)
+	if (
+		model.id.toLowerCase().includes("qwen3.7") ||
+		model.id.toLowerCase().includes("qwen3-7")
+	) {
+		return DEEPSEEK_PROXY_COMPAT;
+	}
+
+	// Kimi K2.6 needs reasoning_content on assistant messages (OpenRouter issue #5309)
+	if (model.id.toLowerCase().includes("kimi")) {
+		return {
+			supportsStore: false,
+			supportsDeveloperRole: false,
+			supportsReasoningEffort: true,
+			requiresReasoningContentOnAssistantMessages: true,
 		};
 	}
 
