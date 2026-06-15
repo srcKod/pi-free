@@ -1,6 +1,9 @@
-import type { Tool } from "@earendil-works/pi-ai";
-import { describe, expect, it } from "vitest";
-import { __test__ } from "../providers/cline/cline-xml-bridge.ts";
+import type { Context, Model, Tool } from "@earendil-works/pi-ai";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+	__test__,
+	streamClineXml,
+} from "../providers/cline/cline-xml-bridge.ts";
 
 function tool(name: string): Tool {
 	return {
@@ -9,6 +12,45 @@ function tool(name: string): Tool {
 		parameters: { type: "object", properties: {} } as Tool["parameters"],
 	};
 }
+
+function clineModel(id = "xiaomi/mimo-v2.5"): Model<string> {
+	return {
+		id,
+		name: id,
+		api: "cline-xml-tools",
+		provider: "cline",
+	} as Model<string>;
+}
+
+function clineContext(): Context {
+	return {
+		systemPrompt: "system",
+		messages: [
+			{
+				role: "user",
+				content: [{ type: "text", text: "continue" }],
+				timestamp: 1,
+			},
+		],
+		tools: [tool("read")],
+	};
+}
+
+function sseResponse(chunks: unknown[], status = 200): Response {
+	const body = `${chunks
+		.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`)
+		.join("")}data: [DONE]\n\n`;
+	return new Response(body, { status });
+}
+
+function requestBody(fetchMock: ReturnType<typeof vi.spyOn>, index: number) {
+	const init = fetchMock.mock.calls[index]?.[1] as RequestInit | undefined;
+	return JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+}
+
+afterEach(() => {
+	vi.restoreAllMocks();
+});
 
 describe("Cline XML bridge", () => {
 	describe("parseXmlToolCalls", () => {
@@ -172,6 +214,89 @@ describe("Cline XML bridge", () => {
 
 			expect(parsed.text).toBe("");
 			expect(parsed.toolCalls).toEqual([]);
+		});
+
+		it("treats plain text before dangling summary close as hidden thinking", () => {
+			const parsed = __test__.parseXmlToolCalls(
+				[
+					"The user makes a good point about worker diversity.",
+					"Let me check if the diversePanel function already handles this.",
+					"</summary>",
+				].join("\n"),
+				[tool("edit"), tool("write")],
+			);
+
+			expect(parsed.text).toBe("");
+			expect(parsed.toolCalls).toEqual([]);
+		});
+
+		it("treats plain text before dangling persistent issue close as hidden thinking", () => {
+			const parsed = __test__.parseXmlToolCalls(
+				[
+					"The user wants me to continue. Let me fix the issues found by the diagnostics.",
+					"The main things to fix are remove unused imports and fix empty catch blocks.",
+					"</persistent_issue_checking>",
+				].join("\n"),
+				[tool("edit"), tool("write")],
+			);
+
+			expect(parsed.text).toBe("");
+			expect(parsed.toolCalls).toEqual([]);
+		});
+
+		it("does not execute tool calls hidden in visible summary wrappers", () => {
+			const parsed = __test__.parseXmlToolCalls(
+				[
+					"<summary>",
+					"The user wants me to inspect the file first.",
+					"<read_file>",
+					"<path>README.md</path>",
+					"</read_file>",
+					"</summary>",
+				].join("\n"),
+				[tool("read")],
+			);
+
+			expect(parsed.text).toBe("");
+			expect(parsed.toolCalls).toEqual([]);
+		});
+
+		it("does not execute tool calls hidden in visible persistent issue wrappers", () => {
+			const parsed = __test__.parseXmlToolCalls(
+				[
+					"<persistent_issue_checking>",
+					"Let me fix the formatter issues now.",
+					"<execute_command>",
+					"<command>npm run check</command>",
+					"</execute_command>",
+					"</persistent_issue_checking>",
+				].join("\n"),
+				[tool("bash")],
+			);
+
+			expect(parsed.text).toBe("");
+			expect(parsed.toolCalls).toEqual([]);
+		});
+
+		it("recovers tool calls inside reasoning-channel hidden wrappers", () => {
+			const parsed = __test__.parseReasoningHiddenToolCalls(
+				[
+					[
+						"The user wants me to inspect the file first.",
+						"<read_file>",
+						"<path>README.md</path>",
+						"</read_file>",
+					].join("\n"),
+				],
+				[tool("read")],
+			);
+
+			expect(parsed.thinking).toEqual([
+				"The user wants me to inspect the file first.",
+			]);
+			expect(parsed.toolCalls).toEqual([
+				{ name: "read", arguments: { path: "README.md" } },
+			]);
 		});
 
 		it("treats DeepSeek-style <think> block content as thinking", () => {
@@ -456,23 +581,111 @@ describe("Cline XML bridge", () => {
 		});
 	});
 
-	describe("prepareClineXmlOutput", () => {
-		it("surfaces reasoning-only Cline responses instead of returning a blank stop", () => {
-			const output = __test__.prepareClineXmlOutput(
-				"",
-				[],
-				[
-					"The user is prompting me to continue. Let me respond with my thoughts on this UX design.",
-				],
-				[],
-			);
+	describe("streamClineXml", () => {
+		it("retries MiMo generic stream errors once without include_reasoning", async () => {
+			const fetchMock = vi
+				.spyOn(globalThis, "fetch")
+				.mockResolvedValueOnce(
+					sseResponse([
+						{
+							error: {
+								code: "error",
+								message: "Stream error occurred",
+							},
+						},
+					]),
+				)
+				.mockResolvedValueOnce(
+					sseResponse([
+						{
+							choices: [
+								{
+									delta: { content: "Recovered without reasoning" },
+									finish_reason: "stop",
+								},
+							],
+						},
+					]),
+				);
 
-			expect(output).toEqual({
-				visibleText:
-					"The user is prompting me to continue. Let me respond with my thoughts on this UX design.",
-				thinkingText: "",
-				toolCalls: [],
+			const stream = streamClineXml(
+				clineModel(),
+				clineContext(),
+				{ apiKey: "token" },
+				{},
+			);
+			const result = await stream.result();
+
+			expect(fetchMock).toHaveBeenCalledTimes(2);
+			expect(requestBody(fetchMock, 0).include_reasoning).toBe(true);
+			expect(requestBody(fetchMock, 1)).not.toHaveProperty(
+				"include_reasoning",
+			);
+			expect(result.stopReason).toBe("stop");
+			expect(result.content).toContainEqual({
+				type: "text",
+				text: "Recovered without reasoning",
 			});
+		});
+
+		it("returns an error instead of a blank stop when Cline streams no content", async () => {
+			vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(sseResponse([]));
+
+			const stream = streamClineXml(
+				clineModel(),
+				clineContext(),
+				{ apiKey: "token" },
+				{},
+			);
+			const result = await stream.result();
+
+			expect(result.stopReason).toBe("error");
+			expect(result.errorMessage).toBe("Cline returned empty response");
+			expect(result.content).toEqual([]);
+		});
+	});
+
+	describe("isRetryableClineReasoningStreamError", () => {
+		it("retries generic Cline stream errors without reasoning", () => {
+			expect(
+				__test__.isRetryableClineReasoningStreamError(
+					new Error("error: Stream error occurred"),
+				),
+			).toBe(true);
+		});
+
+		it("does not retry quota or auth errors", () => {
+			expect(
+				__test__.isRetryableClineReasoningStreamError(
+					new Error("Cline API error 429: Daily free limit reached"),
+				),
+			).toBe(false);
+		});
+	});
+
+	describe("prepareClineXmlOutput", () => {
+		it("returns a visible fallback for reasoning-only Cline responses instead of blank stopping", () => {
+			const reasoning =
+				"Yes — that UX matches. Keep `/toggle-plegma` as the simple activation switch.";
+			const output = __test__.prepareClineXmlOutput("", [], [reasoning], []);
+
+			expect(output.visibleText).toContain(
+				"Cline returned internal reasoning only",
+			);
+			expect(output.thinkingText).toBe(reasoning);
+			expect(output.toolCalls).toEqual([]);
+		});
+
+		it("does not surface internal planning from reasoning-only Cline responses", () => {
+			const internal =
+				"The user is prompting me to continue. Let me respond with my thoughts on this UX design.";
+			const output = __test__.prepareClineXmlOutput("", [], [internal], []);
+
+			expect(output.visibleText).toContain(
+				"Cline returned internal reasoning only",
+			);
+			expect(output.thinkingText).toBe(internal);
+			expect(output.toolCalls).toEqual([]);
 		});
 
 		it("keeps reasoning hidden when visible text is present", () => {
@@ -504,6 +717,40 @@ describe("Cline XML bridge", () => {
 				thinkingText: "I should inspect the file.",
 				toolCalls,
 			});
+		});
+	});
+
+	describe("normalizeDecoratedXmlTags", () => {
+		it("strips Unicode math-italic prefixes from MiMo/Cline thinking tags", () => {
+			const input =
+				"<\u{1D41A}\u{1D42C}\u{1D429}\u{1D428}\u{1D427}:thinking>\nLet me read the file.\n</\u{1D41A}\u{1D42C}\u{1D429}\u{1D428}\u{1D427}:thinking>";
+			const result = __test__.normalizeDecoratedXmlTags(input);
+			expect(result).toContain("<thinking>");
+			expect(result).toContain("</thinking>");
+			expect(result).not.toContain("\u{1D41A}");
+		});
+
+		it("strips Unicode math-italic prefixes from MiMo/Cline tool tags", () => {
+			const input =
+				"<\u{1D41A}\u{1D42C}\u{1D429}\u{1D428}\u{1D427}:read_file>\n<path>README.md</path>\n</\u{1D41A}\u{1D42C}\u{1D429}\u{1D428}\u{1D427}:read_file>";
+			const result = __test__.normalizeDecoratedXmlTags(input);
+			expect(result).toContain("<read_file>");
+			expect(result).toContain("</read_file>");
+			expect(result).not.toContain("\u{1D41A}");
+		});
+
+		it("leaves normal ASCII XML tags unchanged", () => {
+			const input =
+				"<thinking>\nLet me read the file.\n</thinking>\n<read_file>\n<path>README.md</path>\n</read_file>";
+			expect(__test__.normalizeDecoratedXmlTags(input)).toBe(input);
+		});
+
+		it("handles mixed decorated and plain tags", () => {
+			const input = "<\u{1D41A}\u{1D42C}\u{1D429}\u{1D428}\u{1D427}:thinking>plan</\u{1D41A}\u{1D42C}\u{1D429}\u{1D428}\u{1D427}:thinking>\n<read_file>\n<path>x</path>\n</read_file>";
+			const result = __test__.normalizeDecoratedXmlTags(input);
+			expect(result).toContain("<thinking>");
+			expect(result).toContain("<read_file>");
+			expect(result).not.toContain("\u{1D41A}");
 		});
 	});
 
