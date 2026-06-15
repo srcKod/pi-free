@@ -366,7 +366,10 @@ function parseCatHeredocWriteCommand(
 	}
 	if (delimiterLine === -1) return undefined;
 
-	const trailing = lines.slice(delimiterLine + 1).join("\n").trim();
+	const trailing = lines
+		.slice(delimiterLine + 1)
+		.join("\n")
+		.trim();
 	if (trailing) {
 		const trailingLines = trailing.split("\n").filter((line) => line.trim());
 		if (trailingLines.length !== 1) return undefined;
@@ -383,7 +386,9 @@ function parseCatHeredocWriteCommand(
 	};
 }
 
-function getWriteRuntimeToolName(tools: Tool[] | undefined): string | undefined {
+function getWriteRuntimeToolName(
+	tools: Tool[] | undefined,
+): string | undefined {
 	if ((tools ?? []).some((tool) => tool.name === "write_to_file")) {
 		return "write_to_file";
 	}
@@ -781,13 +786,15 @@ function parseToolArguments(block: string): Record<string, unknown> {
 	return args;
 }
 
+type ParsedToolCalls = {
+	text: string;
+	toolCalls: Array<{ name: string; arguments: Record<string, unknown> }>;
+};
+
 function parseXmlToolCalls(
 	rawText: string,
 	tools: Tool[] | undefined,
-): {
-	text: string;
-	toolCalls: Array<{ name: string; arguments: Record<string, unknown> }>;
-} {
+): ParsedToolCalls {
 	const bridgeByRemoteName = new Map(
 		getParseToolBridges(tools).map((bridge) => [bridge.remoteName, bridge]),
 	);
@@ -824,7 +831,10 @@ function parseXmlToolCalls(
 				? parseCatHeredocWriteCommand(stringArg(remoteArgs, "command"))
 				: undefined;
 		if (heredocWrite && writeRuntimeName) {
-			toolCalls.push({ name: writeRuntimeName, arguments: { ...heredocWrite } });
+			toolCalls.push({
+				name: writeRuntimeName,
+				arguments: { ...heredocWrite },
+			});
 		} else {
 			toolCalls.push({
 				name: bridge?.runtimeName ?? next.name,
@@ -837,6 +847,24 @@ function parseXmlToolCalls(
 
 	pushTextFragment(textParts, sourceText.slice(cursor));
 	return { text: textParts.join("\n\n").trim(), toolCalls };
+}
+
+function parseReasoningToolCalls(
+	reasoning: string,
+	tools: Tool[] | undefined,
+): { thinking: string[]; toolCalls: ParsedToolCalls["toolCalls"] } {
+	if (!reasoning.trim()) return { thinking: [], toolCalls: [] };
+
+	const extracted = extractThinkingXml(reasoning);
+	const parsed = parseXmlToolCalls(extracted.text, tools);
+	const thinking = [...extracted.thinking];
+	if (parsed.toolCalls.length > 0 && parsed.text) {
+		thinking.push(parsed.text);
+	} else if (parsed.toolCalls.length === 0 && extracted.thinking.length === 0) {
+		thinking.push(reasoning.trim());
+	}
+
+	return { thinking, toolCalls: parsed.toolCalls };
 }
 
 function usageFromChunkUsage(usage: ClineXmlChunk["usage"] | undefined): Usage {
@@ -1047,21 +1075,23 @@ export function streamClineXml(
 
 			assistant.usage = usageFromChunkUsage(usage);
 			const extractedThinking = extractThinkingXml(rawText);
+			const parsedReasoning = parseReasoningToolCalls(thinking, context.tools);
 			pushThinking(
 				assistant,
-				[thinking.trim(), ...extractedThinking.thinking]
+				[...parsedReasoning.thinking, ...extractedThinking.thinking]
 					.filter(Boolean)
 					.join("\n\n"),
 				stream,
 			);
 			const parsed = parseXmlToolCalls(extractedThinking.text, context.tools);
+			const toolCalls = [...parsed.toolCalls, ...parsedReasoning.toolCalls];
 			pushText(assistant, parsed.text, stream);
-			for (const toolCall of parsed.toolCalls) {
+			for (const toolCall of toolCalls) {
 				pushToolCall(assistant, toolCall, stream);
 			}
 
 			assistant.stopReason =
-				parsed.toolCalls.length > 0
+				toolCalls.length > 0
 					? "toolUse"
 					: finishReason === "length"
 						? "length"
@@ -1088,6 +1118,7 @@ export function streamClineXml(
 
 export const __test__ = {
 	buildClineXmlMessages,
+	parseReasoningToolCalls,
 	parseXmlToolCalls,
 	serializeXmlToolCall,
 };

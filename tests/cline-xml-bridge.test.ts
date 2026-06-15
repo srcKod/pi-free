@@ -63,7 +63,7 @@ describe("Cline XML bridge", () => {
 					"  }",
 					"}",
 					"JSONEOF",
-					"cat \"C:/Users/R3LiC/Desktop/pi-plegma/.pi/extensions/plegma/package.json\"</command>",
+					'cat "C:/Users/R3LiC/Desktop/pi-plegma/.pi/extensions/plegma/package.json"</command>',
 					"</execute_command>",
 				].join("\n"),
 				[tool("bash"), tool("write")],
@@ -220,6 +220,42 @@ describe("Cline XML bridge", () => {
 						path: "C:/Users/R3LiC/Desktop/pi-plegma/pi capabilities.md",
 						content:
 							"# Pi SDK Capabilities for Plegma\nThis document maps pi's existing SDK capabilities to Plegma's requirements.",
+					},
+				},
+			]);
+		});
+
+		it("recovers write_to_file emitted in the reasoning channel", () => {
+			const parsed = __test__.parseReasoningToolCalls(
+				[
+					"Good, the package.json is created correctly. Now I need to write index.ts.",
+					"</thinking>",
+					"<write_to_file>",
+					"<path>C:/Users/R3LiC/Desktop/pi-plegma/.pi/extensions/plegma/index.ts</path>",
+					"<content>/**",
+					" * Plegma extension",
+					" */",
+					"const branch = `plegma-${runId}-${role}`;",
+					"</content>",
+					"</write_to_file>",
+				].join("\n"),
+				[tool("write")],
+			);
+
+			expect(parsed.thinking).toEqual([
+				"Good, the package.json is created correctly. Now I need to write index.ts.",
+			]);
+			expect(parsed.toolCalls).toEqual([
+				{
+					name: "write",
+					arguments: {
+						path: "C:/Users/R3LiC/Desktop/pi-plegma/.pi/extensions/plegma/index.ts",
+						content: [
+							"/**",
+							" * Plegma extension",
+							" */",
+							"const branch = `plegma-${runId}-${role}`;",
+						].join("\n"),
 					},
 				},
 			]);
