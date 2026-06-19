@@ -9,13 +9,35 @@
  * (e.g. after toggle-{provider}) are visible immediately.
  */
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+	PROVIDER_BAI,
+	PROVIDER_CLINE,
+	PROVIDER_FASTROUTER,
+	PROVIDER_KILO,
+	PROVIDER_OLLAMA,
+	PROVIDER_OPENCODE,
+	PROVIDER_OPENROUTER,
+	PROVIDER_ROUTEWAY,
+	PROVIDER_TOKENROUTER,
+	PROVIDER_ZENMUX,
+	PROVIDER_CROFAI,
+	PROVIDER_CODESTRAL,
+	PROVIDER_LLM7,
+	PROVIDER_DEEPINFRA,
+	PROVIDER_SAMBANOVA,
+	PROVIDER_TOGETHER,
+	PROVIDER_NOVITA,
+} from "./constants.ts";
 export {
 	PROVIDER_BAI,
 	PROVIDER_CLINE,
+	PROVIDER_FASTROUTER,
 	PROVIDER_KILO,
 	PROVIDER_MODAL,
+	PROVIDER_OPENCODE,
+	PROVIDER_OPENROUTER,
 	PROVIDER_QWEN,
 	PROVIDER_ROUTEWAY,
 	PROVIDER_TOKENROUTER,
@@ -130,6 +152,9 @@ function ensureConfigFile(): void {
 				);
 				return;
 			}
+			// Always tighten permissions on startup, even if contents are
+			// unchanged — older installs may have a world-readable file.
+			restrictConfigFilePermissions();
 			// Merge with template to add any missing keys, preserving existing values
 			const merged = { ...CONFIG_TEMPLATE, ...existing };
 			if (JSON.stringify(merged) !== JSON.stringify(existing)) {
@@ -138,6 +163,7 @@ function ensureConfigFile(): void {
 					`${JSON.stringify(merged, null, 2)}\n`,
 					"utf8",
 				);
+				restrictConfigFilePermissions();
 			}
 		} else {
 			writeFileSync(
@@ -145,9 +171,28 @@ function ensureConfigFile(): void {
 				`${JSON.stringify(CONFIG_TEMPLATE, null, 2)}\n`,
 				"utf8",
 			);
+			restrictConfigFilePermissions();
 		}
 	} catch (err) {
 		_logger.warn("Could not create config file", {
+			path: CONFIG_PATH,
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
+}
+
+/**
+ * Restrict `~/.pi/free.json` to owner read/write (0600). The file may
+ * contain API keys for paid providers, so it must never be world-readable.
+ * Best-effort: if chmod is not supported on the platform/filesystem,
+ * log a warning and continue (the keys are still safe inside the user's
+ * home directory).
+ */
+function restrictConfigFilePermissions(): void {
+	try {
+		chmodSync(CONFIG_PATH, 0o600);
+	} catch (err) {
+		_logger.warn("Could not restrict config file permissions to 0600", {
 			path: CONFIG_PATH,
 			error: err instanceof Error ? err.message : String(err),
 		});
@@ -194,6 +239,56 @@ function resolveBool(envKey: string, fileVal?: boolean): boolean {
 	if (envValue === "true") return true;
 	if (envValue === "false") return false;
 	return fileVal === true;
+}
+
+// =============================================================================
+// Per-provider metadata table
+// Adding a new provider only requires a single entry here plus the
+// corresponding field in the PiFreeConfig interface and CONFIG_TEMPLATE.
+// Each entry pairs the provider ID with its env-var prefix (used for both
+// the API key and show_paid flag) and the typed key on PiFreeConfig.
+// =============================================================================
+
+interface ProviderMeta {
+	id: string;
+	/** Env var prefix, e.g. "KILO" => KILO_SHOW_PAID and KILO_API_KEY */
+	prefix: string;
+	/** Typed accessor returning the show_paid value from PiFreeConfig */
+	showPaidKey: keyof PiFreeConfig;
+}
+
+const PROVIDER_META: readonly ProviderMeta[] = [
+	{ id: PROVIDER_KILO, prefix: "KILO", showPaidKey: "kilo_show_paid" },
+	{ id: PROVIDER_CLINE, prefix: "CLINE", showPaidKey: "cline_show_paid" },
+	{ id: PROVIDER_ZENMUX, prefix: "ZENMUX", showPaidKey: "zenmux_show_paid" },
+	{ id: PROVIDER_CROFAI, prefix: "CROFAI", showPaidKey: "crofai_show_paid" },
+	{ id: PROVIDER_CODESTRAL, prefix: "CODESTRAL", showPaidKey: "codestral_show_paid" },
+	{ id: PROVIDER_LLM7, prefix: "LLM7", showPaidKey: "llm7_show_paid" },
+	{ id: PROVIDER_DEEPINFRA, prefix: "DEEPINFRA", showPaidKey: "deepinfra_show_paid" },
+	{ id: PROVIDER_SAMBANOVA, prefix: "SAMBANOVA", showPaidKey: "sambanova_show_paid" },
+	{ id: PROVIDER_TOGETHER, prefix: "TOGETHER", showPaidKey: "together_show_paid" },
+	{ id: PROVIDER_NOVITA, prefix: "NOVITA", showPaidKey: "novita_show_paid" },
+	{ id: PROVIDER_ROUTEWAY, prefix: "ROUTEWAY", showPaidKey: "routeway_show_paid" },
+	{ id: PROVIDER_TOKENROUTER, prefix: "TOKENROUTER", showPaidKey: "tokenrouter_show_paid" },
+	{ id: PROVIDER_BAI, prefix: "BAI", showPaidKey: "bai_show_paid" },
+	{ id: PROVIDER_FASTROUTER, prefix: "FASTROUTER", showPaidKey: "fastrouter_show_paid" },
+	{ id: PROVIDER_OLLAMA, prefix: "OLLAMA", showPaidKey: "ollama_show_paid" },
+	{ id: PROVIDER_OPENROUTER, prefix: "OPENROUTER", showPaidKey: "openrouter_show_paid" },
+	{ id: PROVIDER_OPENCODE, prefix: "OPENCODE", showPaidKey: "opencode_show_paid" },
+];
+
+const PROVIDER_META_BY_ID = new Map(PROVIDER_META.map((m) => [m.id, m]));
+
+/**
+ * Generic show_paid resolver backed by PROVIDER_META. Returns false
+ * for unknown provider IDs (matches the previous switch default).
+ */
+function resolveShowPaidForProvider(providerId: string): boolean {
+	const meta = PROVIDER_META_BY_ID.get(providerId);
+	if (!meta) return false;
+	const cfg = loadConfigFile();
+	const fileVal = cfg[meta.showPaidKey];
+	return resolveBool(`${meta.prefix}_SHOW_PAID`, fileVal as boolean | undefined);
 }
 
 // =============================================================================
@@ -287,44 +382,7 @@ export function getOpencodeShowPaid(): boolean {
 }
 
 export function getProviderShowPaid(providerId: string): boolean {
-	switch (providerId) {
-		case "kilo":
-			return getKiloShowPaid();
-		case "cline":
-			return getClineShowPaid();
-		case "zenmux":
-			return getZenmuxShowPaid();
-		case "crofai":
-			return getCrofaiShowPaid();
-		case "codestral":
-			return getCodestralShowPaid();
-		case "llm7":
-			return getLlm7ShowPaid();
-		case "deepinfra":
-			return getDeepinfraShowPaid();
-		case "sambanova":
-			return getSambanovaShowPaid();
-		case "together":
-			return getTogetherShowPaid();
-		case "novita":
-			return getNovitaShowPaid();
-		case "routeway":
-			return getRoutewayShowPaid();
-		case "tokenrouter":
-			return getTokenrouterShowPaid();
-		case "bai":
-			return getBaiShowPaid();
-		case "fastrouter":
-			return getFastrouterShowPaid();
-		case "ollama-cloud":
-			return getOllamaShowPaid();
-		case "openrouter":
-			return getOpenrouterShowPaid();
-		case "opencode":
-			return getOpencodeShowPaid();
-		default:
-			return false;
-	}
+	return resolveShowPaidForProvider(providerId);
 }
 
 // =============================================================================

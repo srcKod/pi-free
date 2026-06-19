@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.3] - 2026-06-19
+
+### Refactored
+
+- `index.ts`: Introduce a `UNIQUE_PROVIDERS` array as the single source
+  of truth for the provider list. `Promise.allSettled` now maps over
+  it instead of a hardcoded 14-element literal, so adding a new
+  provider is a one-line change in the array (DRYKISS DRY finding).
+- `index.ts`: Trim the outdated top-level docstring; point to
+  `UNIQUE_PROVIDERS` and `README.md` for the full provider catalog
+  (DRYKISS Documentation finding).
+
+## [2.2.2] - 2026-06-19
+
+### Refactored
+
+- `config.ts`: Introduced `PROVIDER_META` table that pairs each
+  provider's ID, env-var prefix, and typed config key. `getProviderShowPaid`
+  now delegates to a generic `resolveShowPaidForProvider` resolver
+  instead of a 17-case switch. New `PROVIDER_OPENROUTER`, `PROVIDER_OPENCODE`,
+  and `PROVIDER_FASTROUTER` constants added to `constants.ts` and used
+  in the table (DRYKISS DRY/Architecture findings).
+- `index.ts`: Wrap dynamic built-in provider import in `try/catch`
+  with full error+stack logging to both `~/.pi/free.log` and stderr
+  (DRYKISS Resilience finding).
+- `providers/bai/bai.ts`: Improve startup-failure message to point users
+  at `~/.pi/free.log` and their API key (DRYKISS Resilience finding).
+
+## [2.2.1] - 2026-06-19
+
+### Security
+
+- `~/.pi/free.json` (which contains API keys for paid providers) is now
+  written and re-tightened with mode `0600` (owner read/write only) on
+  every startup and on every write. Previously the file was world-readable
+  on Unix. No-op on Windows. Closes DRYKISS finding.
+
+### Fixed
+
+- Wrap quota monitoring and telemetry event handlers in `try/catch` so a
+  failed status-bar update or telemetry write can never break the agent
+  loop (DRYKISS resilience findings).
+
 ## [2.2.0] - 2026-06-19
 
 ### Added

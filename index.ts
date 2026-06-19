@@ -4,19 +4,8 @@
  * Provides free model filtering for ALL providers (built-in + extension)
  * plus unique free/paid providers not covered by pi's built-in providers.
  *
- * Unique providers:
- * - Kilo: OAuth-based free models
- * - Cline: Cline bot integration
- * - NVIDIA: NVIDIA NIM hosting (free tier available)
- * - Ollama Cloud: Ollama's cloud-hosted models with usage-based free tier
- * - ZenMux: Unified AI API gateway with 200+ models
- * - Codestral: Mistral's code-focused model via codestral.mistral.ai (free tier)
- * - DeepInfra: AI inference cloud ($5 trial credit)
- * - SambaNova: Fast inference on RDU hardware (free tier, no credit card)
- * - Together: Fast inference on 200+ open-source models ($1 trial credit)
- * - Routeway: OpenAI-compatible gateway with free `:free` models
- * - TokenRouter: OpenAI-compatible gateway routing to 90+ models
- * - LLM7: AI gateway (free default/fast selectors)
+ * The unique provider list is defined in `UNIQUE_PROVIDERS` below; see
+ * `README.md` for the full provider catalog.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -55,6 +44,31 @@ import tokenRouter from "./providers/tokenrouter/tokenrouter.ts";
 import ollama from "./providers/ollama/ollama.ts";
 import zenmux from "./providers/zenmux/zenmux.ts";
 import bai from "./providers/bai/bai.ts";
+
+/**
+ * Single source of truth for unique provider extensions (providers NOT
+ * built into pi). Each entry is an async function that registers its
+ * provider with pi. Add a new provider by:
+ *   1. Adding the import above
+ *   2. Adding an entry to this array
+ *   3. Adding the provider constant + getter to constants.ts and config.ts
+ */
+const UNIQUE_PROVIDERS: ReadonlyArray<(pi: ExtensionAPI) => Promise<void>> = [
+	kilo,
+	ollama,
+	cline,
+	zenmux,
+	crofai,
+	codestral,
+	llm7,
+	deepinfra,
+	sambanova,
+	together,
+	novita,
+	routeway,
+	tokenRouter,
+	bai,
+];
 
 const _logger = createLogger("pi-free");
 
@@ -222,29 +236,42 @@ function setupQuotaMonitoring(pi: ExtensionAPI) {
 	(pi as any).on(
 		"after_provider_response",
 		(event: { status: number; headers: Record<string, string> }, ctx: any) => {
-			const providerId = ctx.model?.provider;
-			if (!providerId) return;
+			try {
+				const providerId = ctx.model?.provider;
+				if (!providerId) return;
 
-			processQuotaResponse(providerId, event.headers);
+				processQuotaResponse(providerId, event.headers);
 
-			// Update status bar with quota for the active provider
-			const status = formatQuotaStatus(providerId);
-			if (status) {
-				ctx.ui.setStatus("quota", status);
+				// Update status bar with quota for the active provider
+				const status = formatQuotaStatus(providerId);
+				if (status) {
+					ctx.ui.setStatus("quota", status);
+				}
+			} catch (err) {
+				// Quota monitoring is best-effort — never break the agent flow
+				_logger.warn("quota monitoring failed", {
+					error: err instanceof Error ? err.message : String(err),
+				});
 			}
 		},
 	);
 
 	// Clear quota status when switching away from a provider
 	pi.on("model_select", (_event, ctx) => {
-		const providerId = ctx.model?.provider;
-		if (!providerId) {
-			ctx.ui.setStatus("quota", undefined);
-			return;
+		try {
+			const providerId = ctx.model?.provider;
+			if (!providerId) {
+				ctx.ui.setStatus("quota", undefined);
+				return;
+			}
+			// Show cached quota on provider switch (if still fresh)
+			const status = formatQuotaStatus(providerId);
+			ctx.ui.setStatus("quota", status);
+		} catch (err) {
+			_logger.warn("quota status update failed", {
+				error: err instanceof Error ? err.message : String(err),
+			});
 		}
-		// Show cached quota on provider switch (if still fresh)
-		const status = formatQuotaStatus(providerId);
-		ctx.ui.setStatus("quota", status);
 	});
 }
 
@@ -261,7 +288,14 @@ function setupTelemetry(pi: ExtensionAPI) {
 		const provider = ctx.model?.provider;
 		const model = ctx.model?.id;
 		if (provider && model) {
-			startModelCall(provider, model);
+			try {
+				startModelCall(provider, model);
+			} catch (err) {
+				// Telemetry is best-effort — never break the agent flow
+				_logger.warn("telemetry startModelCall failed", {
+					error: err instanceof Error ? err.message : String(err),
+				});
+			}
 		}
 	});
 
@@ -300,17 +334,24 @@ function setupTelemetry(pi: ExtensionAPI) {
 		const cost = usage?.cost?.total ?? 0;
 		const isError = msg.stopReason === "error" || !!msg.errorMessage;
 
-		await recordModelCall(
-			provider,
-			model,
-			{ input: inputTokens, output: outputTokens, totalTokens },
-			cost,
-			{
-				success: !isError,
-				stopReason: msg.stopReason,
-				errorMessage: msg.errorMessage,
-			},
-		);
+		try {
+			await recordModelCall(
+				provider,
+				model,
+				{ input: inputTokens, output: outputTokens, totalTokens },
+				cost,
+				{
+					success: !isError,
+					stopReason: msg.stopReason,
+					errorMessage: msg.errorMessage,
+				},
+			);
+		} catch (err) {
+			// Telemetry is best-effort — never break the agent flow
+			_logger.warn("telemetry recordModelCall failed", {
+				error: err instanceof Error ? err.message : String(err),
+			});
+		}
 	});
 }
 
@@ -333,29 +374,26 @@ export default async function piFreeEntry(pi: ExtensionAPI) {
 
 	// Load all unique providers
 	// Each provider will register itself with the global toggle system
-	await Promise.allSettled([
-		kilo(pi),
-		ollama(pi),
-		cline(pi),
-		zenmux(pi),
-		crofai(pi),
-		codestral(pi),
-		llm7(pi),
-		deepinfra(pi),
-		sambanova(pi),
-		together(pi),
-		novita(pi),
-		routeway(pi),
-		tokenRouter(pi),
-		bai(pi),
-	]);
+	await Promise.allSettled(UNIQUE_PROVIDERS.map((setup) => setup(pi)));
 
 	// Setup dynamic built-in providers (Mistral, Groq, Cerebras, xAI, Hugging Face,
 	// OpenRouter/OpenCode from Pi auth, and FastRouter public model discovery)
-	const { setupDynamicBuiltInProviders } = await import(
-		"./providers/dynamic-built-in/index.ts"
-	);
-	await setupDynamicBuiltInProviders(pi);
+	try {
+		const { setupDynamicBuiltInProviders } = await import(
+			"./providers/dynamic-built-in/index.ts"
+		);
+		await setupDynamicBuiltInProviders(pi);
+	} catch (err) {
+		// Dynamic providers are a best-effort enhancement — if the import
+		// or init fails (e.g. upstream API change), continue with the
+		// already-registered static providers rather than failing the whole
+		// extension load. Log full error (message + stack) to the structured
+		// log so the user can investigate, but never block startup.
+		_logger.error("[pi-free] Dynamic built-in providers failed to load", {
+			error: err instanceof Error ? err.message : String(err),
+			stack: err instanceof Error ? err.stack : undefined,
+		});
+	}
 
 	// Setup toggles for pi's built-in providers (e.g., OpenCode)
 	setupBuiltInProviderToggles(pi);
