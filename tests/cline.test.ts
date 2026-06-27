@@ -27,8 +27,11 @@ vi.mock("../lib/util.ts", () => ({
 	logWarning: vi.fn(),
 }));
 
+const mockGetClineApiKey = vi.fn();
+
 vi.mock("../config.ts", () => ({
 	getClineShowPaid: () => mockGetClineShowPaid(),
+	getClineApiKey: () => mockGetClineApiKey(),
 	saveConfig: (...args: unknown[]) => mockSaveConfig(...args),
 }));
 
@@ -69,6 +72,7 @@ describe("Cline Provider", () => {
 		mockOn = vi.fn();
 		commandHandlers = {};
 		mockGetClineShowPaid.mockReturnValue(false);
+		mockGetClineApiKey.mockReturnValue(undefined);
 		mockLoadProviderCache.mockReturnValue(undefined);
 		mockSaveProviderCache.mockResolvedValue(undefined);
 		mockIsProviderCacheFresh.mockReturnValue(false);
@@ -157,6 +161,24 @@ describe("Cline Provider", () => {
 					]),
 				}),
 			);
+		});
+
+		it("should use API key auth when configured", async () => {
+			mockGetClineApiKey.mockReturnValue("sk-cline-test");
+			vi.mocked(fetchClineModels).mockResolvedValue([]);
+
+			await clineProvider(mockPi);
+
+			expect(mockRegisterProvider).toHaveBeenCalledWith(
+				"cline",
+				expect.objectContaining({
+					apiKey: "sk-cline-test",
+					authHeader: false,
+					streamSimple: expect.any(Function),
+				}),
+			);
+			const registerCall = mockRegisterProvider.mock.calls[0];
+			expect(registerCall[1]).not.toHaveProperty("oauth");
 		});
 	});
 
