@@ -3,15 +3,17 @@
  *
  * Registers the Qoder provider with Pi, providing free access to top-tier
  * LLM models (DeepSeek V4 Pro/Flash, Qwen3.7 Plus/Max, GLM 5.1, Kimi K2.6,
- * MiniMax M3) through Qoder's proprietary API.
+ * MiniMax M3) through Qoder's OpenAI-compatible API.
  *
  * Qoder uses a custom authentication protocol (PAT exchange + COSY signing)
- * and a non-standard streaming API. All models are completely free — no
- * paid tier exists.
+ * and a credits-based pricing model:
+ *   - Community Edition (free): basic models with daily message limits
+ *   - Pro / Pro+ / Ultra (paid): premium models via monthly credits
  *
  * Usage:
  *   Install pi-free, then run /login qoder to authenticate
  *   (PAT paste or browser OAuth)
+ *   /toggle-qoder switches between basic (free-tier) and all models
  *
  * Environment variables:
  *   QODER_PERSONAL_ACCESS_TOKEN — PAT for headless auth (optional)
@@ -26,13 +28,15 @@ import type {
 import { BASE_URL_QODER, PROVIDER_QODER } from "../../constants.ts";
 import {
 	getCachedModels,
+	isBasicModel,
 	isCacheStale,
 	updateQoderModelsCache,
+	type QoderModelConfig,
 } from "./models.ts";
 import { getCachedCredentials, loginQoder, refreshQoderToken } from "./auth.ts";
 import { streamQoder } from "./stream.ts";
 import { enhanceWithCI } from "../../provider-helper.ts";
-import { isFreeModel, registerWithGlobalToggle } from "../../lib/registry.ts";
+import { registerWithGlobalToggle } from "../../lib/registry.ts";
 
 // =============================================================================
 // Extension Entry Point
@@ -42,11 +46,9 @@ export default async function qoderProvider(pi: ExtensionAPI) {
 	const logger = (await import("../../lib/logger.ts")).createLogger("qoder");
 
 	// Initial model fetch
-	let allModels: ProviderModelConfig[] = getCachedModels();
-	let freeModels: ProviderModelConfig[] = allModels.filter((m) =>
-		isFreeModel({ ...m, provider: PROVIDER_QODER }, allModels),
-	);
-	const stored = { free: freeModels, all: allModels };
+	let allModels: QoderModelConfig[] = getCachedModels();
+	let basicModels: QoderModelConfig[] = allModels.filter(isBasicModel);
+	const stored = { free: basicModels, all: allModels };
 
 	// ── OAuth config (defined before reRegister so it's always available) ──
 	const oauthConfig = {
@@ -97,11 +99,9 @@ export default async function qoderProvider(pi: ExtensionAPI) {
 		const fresh = getCachedModels();
 		if (fresh.length > 0) {
 			allModels = fresh;
-			freeModels = fresh.filter((m) =>
-				isFreeModel({ ...m, provider: PROVIDER_QODER }, fresh),
-			);
+			basicModels = fresh.filter(isBasicModel);
 			stored.all = allModels;
-			stored.free = freeModels;
+			stored.free = basicModels;
 			reRegister(allModels);
 			logger.info(`[qoder] Models refreshed: ${allModels.length}`);
 		}
@@ -109,6 +109,41 @@ export default async function qoderProvider(pi: ExtensionAPI) {
 
 	// Register with global toggle system so it participates in /toggle-free
 	registerWithGlobalToggle(PROVIDER_QODER, stored, (m) => reRegister(m), false);
+
+	// Per-provider toggle: /toggle-qoder (basic free-tier ↔ all models)
+	const getQoderShowPaid = () => {
+		try {
+			return JSON.parse(
+				(process.env.QODER_SHOW_PAID ?? "false").toLowerCase(),
+			);
+		} catch {
+			return false;
+		}
+	};
+	let showPaidModels = getQoderShowPaid();
+
+	pi.registerCommand("toggle-qoder", {
+		description: "Toggle between basic (free-tier) and all Qoder models",
+		handler: (_args, ctx) => {
+			showPaidModels = !showPaidModels;
+			if (showPaidModels) {
+				reRegister(stored.all);
+				const basicCount = stored.free.length;
+				const premiumCount = stored.all.length - basicCount;
+				ctx.ui.notify(
+					`qoder: showing all ${stored.all.length} models (${basicCount} basic, ${premiumCount} premium)`,
+					"info",
+				);
+			} else {
+				reRegister(stored.free);
+				ctx.ui.notify(
+					`qoder: showing ${stored.free.length} basic (free-tier) models`,
+					"info",
+				);
+			}
+			return Promise.resolve();
+		},
+	});
 
 	// If user is already authenticated and cache is stale, refresh at startup
 	// (mirrors kilo/cline pattern: check cache freshness before hitting network)

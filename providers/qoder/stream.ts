@@ -1,12 +1,13 @@
 /**
  * Qoder custom streaming handler.
  *
- * Qoder's API is NOT OpenAI-compatible — it uses a proprietary protocol at
- * `api3.qoder.sh/algo/api/v2/service/pro/sse/agent_chat_generation` with
- * COSY-signed headers, WAF-encoded bodies, and a custom SSE event format.
+ * Qoder's current production API is OpenAI-compatible and lives at
+ * `api2-v2.qoder.sh/model/v1/chat/completions` with standard Bearer auth.
+ * The legacy proprietary SSE/protocol endpoint at api3.qoder.sh has been
+ * decommissioned and returns 500 Internal Server Error.
  *
- * This module implements the full `streamSimple` interface that Pi expects,
- * bridging Qoder's proprietary streaming to Pi's `AssistantMessageEventStream`.
+ * This module implements the `streamSimple` interface that Pi expects,
+ * translating Qoder's response format to Pi's `AssistantMessageEventStream`.
  */
 
 import crypto from "node:crypto";
@@ -22,14 +23,14 @@ import type {
 	ToolCall,
 } from "@earendil-works/pi-ai";
 import * as PiAi from "@earendil-works/pi-ai";
-import { buildAuthHeaders, getMachineId } from "./cosy.ts";
 import { getCachedModelConfig } from "./models.ts";
 import { getCachedCredentials } from "./auth.ts";
-import { qoderEncodeBody } from "./encoding.ts";
 import { ThinkingTagParser } from "./thinking-parser.ts";
 import { transformMessagesForQoder, transformTools } from "./transform.ts";
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// =============================================================================
+// Helpers / State
+// =============================================================================
 
 interface ToolCallState {
 	arguments: string;
@@ -47,52 +48,12 @@ interface StreamState {
 	thinkingBlockIndex: number;
 	toolCallsState: ToolCallState[];
 	thinkingParser: ThinkingTagParser | null;
+	hasReasoningContent: boolean;
 }
 
-function stableHash(prefix: string, ...inputs: string[]): string {
-	const hash = crypto.createHash("sha256");
-	hash.update(prefix);
-	for (const input of inputs) {
-		hash.update("\0");
-		hash.update(input);
-	}
-	return hash.digest("hex").slice(0, 16);
-}
-
-function stableChatRecordID(
-	model: string,
-	messages: Array<{ role?: string; content?: unknown }>,
-	tools: unknown,
-	maxTokens: number,
-): string {
-	const hash = crypto.createHash("sha256");
-	hash.update("qoder-record");
-	hash.update("\0");
-	hash.update(model);
-	for (const msg of messages) {
-		if (msg?.role) {
-			hash.update("\0");
-			hash.update(msg.role);
-		}
-		if (msg?.content) {
-			hash.update("\0");
-			hash.update(
-				typeof msg.content === "string"
-					? msg.content
-					: JSON.stringify(msg.content),
-			);
-		}
-	}
-	if (tools) {
-		hash.update("\0");
-		hash.update(JSON.stringify(tools));
-	}
-	hash.update("\0");
-	hash.update(`mt=${maxTokens}`);
-	return hash.digest("hex").slice(0, 16);
-}
-
-// ─── Delta processing helpers ────────────────────────────────────────────────
+// =============================================================================
+// Delta processing
+// =============================================================================
 
 function processReasoningDelta(
 	state: StreamState,
@@ -134,7 +95,7 @@ function closeThinkingBlock(state: StreamState): void {
 }
 
 function processTextDelta(state: StreamState, text: string): void {
-	if (state.thinkingParser) {
+	if (state.thinkingParser && !state.hasReasoningContent) {
 		state.thinkingParser.processChunk(text);
 		return;
 	}
@@ -210,8 +171,9 @@ function processDelta(
 	state: StreamState,
 	delta: Record<string, unknown>,
 ): void {
-	// 1. Reasoning content (API-native)
+	// 1. Reasoning content (API-native OpenAI-compatible extension)
 	if (delta.reasoning_content) {
+		state.hasReasoningContent = true;
 		processReasoningDelta(state, delta.reasoning_content as string);
 	}
 
@@ -256,7 +218,9 @@ function finalizeToolCalls(state: StreamState): void {
 	}
 }
 
-// ─── SSE parsing ─────────────────────────────────────────────────────────────
+// =============================================================================
+// SSE parsing (OpenAI-compatible stream)
+// =============================================================================
 
 function handleSSELine(
 	state: StreamState,
@@ -268,19 +232,15 @@ function handleSSELine(
 	if (dataStr === "[DONE]") return true;
 
 	try {
-		const envelope = JSON.parse(dataStr);
-		if (envelope.statusCodeValue && envelope.statusCodeValue !== 200) {
+		const parsed = JSON.parse(dataStr);
+		if (parsed.error) {
 			throw new Error(
-				`Upstream status ${envelope.statusCodeValue}: ${envelope.body}`,
+				parsed.error.message || JSON.stringify(parsed.error),
 			);
 		}
 
-		const innerStr = envelope.body;
-		if (!innerStr || innerStr === "[DONE]") return false;
-
-		const inner = JSON.parse(innerStr);
-		if (inner.choices && inner.choices.length > 0) {
-			const choice = inner.choices[0];
+		if (parsed.choices && parsed.choices.length > 0) {
+			const choice = parsed.choices[0];
 			if (choice.delta) {
 				processDelta(state, choice.delta);
 			}
@@ -320,7 +280,85 @@ async function consumeSSEStream(
 	}
 }
 
-// ─── Request builder ─────────────────────────────────────────────────────────
+// =============================================================================
+// Request builder (OpenAI-compatible)
+// =============================================================================
+
+const QODER_CHAT_URL =
+	"https://api2-v2.qoder.sh/model/v1/chat/completions";
+
+interface StreamSetup {
+	accessToken: string;
+	qoderModel: string;
+	modelConfig: Record<string, unknown>;
+	normalizedMessages: unknown[];
+	systemText: string;
+	maxTokens: number;
+	toolsRaw: unknown;
+}
+
+function buildStreamSetup(
+	model: Model<Api>,
+	context: Context,
+	options: SimpleStreamOptions | undefined,
+): StreamSetup {
+	const accessToken = options?.apiKey;
+	if (!accessToken) {
+		throw new Error(
+			"Qoder credentials not set. Run /login qoder or set QODER_PERSONAL_ACCESS_TOKEN.",
+		);
+	}
+
+	// Log for diagnostics (visible in pi output)
+	const isDebug = process.env.QODER_DEBUG === "1";
+
+	const qoderModel = model.id;
+	const modelConfig = getCachedModelConfig(qoderModel) || {
+		key: qoderModel,
+		is_reasoning: isReasoningModel(qoderModel),
+		max_output_tokens: 32768,
+		source: "system",
+	};
+
+	const maxOutputTokens = (modelConfig.max_output_tokens as number) || 32768;
+
+	let normalizedMessages = transformMessagesForQoder(context.messages);
+	const systemText = context.systemPrompt || "";
+
+	// Prepend system prompt as a system message if present.
+	if (systemText) {
+		normalizedMessages = [
+			{ role: "system", content: systemText },
+			...normalizedMessages,
+		];
+	}
+
+	const maxTokens = resolveMaxTokens(maxOutputTokens, options?.maxTokens);
+
+	const toolsRaw =
+		context.tools && context.tools.length > 0
+			? transformTools(context.tools)
+			: undefined;
+
+	if (isDebug) {
+		console.log(
+			"[QODER] req endpoint=" + QODER_CHAT_URL +
+			" token=" + accessToken.substring(0, 50) +
+			" model=" + qoderModel +
+			" messages=" + normalizedMessages.length,
+		);
+	}
+
+	return {
+		accessToken,
+		qoderModel,
+		modelConfig,
+		normalizedMessages,
+		systemText,
+		maxTokens,
+		toolsRaw,
+	};
+}
 
 async function fetchQoderStream(
 	setup: StreamSetup,
@@ -329,106 +367,49 @@ async function fetchQoderStream(
 	const {
 		accessToken,
 		qoderModel,
-		modelConfig,
 		normalizedMessages,
-		lastUserText,
-		systemText,
 		maxTokens,
 		toolsRaw,
-		recordID,
-		userID,
-		name,
-		email,
-		machineID,
 	} = setup;
-	const sessionID = stableHash("qoder-session", userID, qoderModel);
-
-	const isReasoning = Boolean(modelConfig.is_reasoning);
 
 	const reqBody: Record<string, unknown> = {
-		request_id: crypto.randomUUID(),
-		request_set_id: recordID,
-		chat_record_id: recordID,
-		session_id: sessionID,
-		stream: true,
-		chat_task: "FREE_INPUT",
-		is_reply: true,
-		is_retry: false,
-		source: 1,
-		version: "3",
-		session_type: "qodercli",
-		agent_id: "agent_common",
-		task_id: "common",
-		code_language: "",
-		chat_prompt: "",
-		image_urls: null,
-		aliyun_user_type: "",
-		system: systemText,
+		model: qoderModel,
 		messages: normalizedMessages,
-		tools: toolsRaw || [],
-		parameters: { max_tokens: maxTokens },
-		chat_context: {
-			chatPrompt: "",
-			imageUrls: null,
-			extra: {
-				context: [],
-				modelConfig: {
-					key: qoderModel,
-					is_reasoning: isReasoning,
-				},
-				originalContent: lastUserText,
-			},
-			features: [],
-			text: lastUserText,
-		},
-		model_config: modelConfig,
-		business: {
-			product: "cli",
-			version: "1.0.0",
-			type: "agent",
-			stage: "start",
-			id: crypto.randomUUID(),
-			name: lastUserText.substring(0, 30),
-			begin_at: Date.now(),
-		},
+		stream: true,
 	};
 
-	const bodyBytes = Buffer.from(JSON.stringify(reqBody));
-	const encodedBody = qoderEncodeBody(bodyBytes);
-	const encodedBytes = Buffer.from(encodedBody, "utf8");
+	if (toolsRaw && Array.isArray(toolsRaw) && toolsRaw.length > 0) {
+		reqBody.tools = toolsRaw;
+	}
 
-	const chatURL =
-		"https://api3.qoder.sh/algo/api/v2/service/pro/sse/agent_chat_generation?FetchKeys=llm_model_result&AgentId=agent_common&Encode=1";
+	if (maxTokens < 32768) {
+		reqBody.max_tokens = maxTokens;
+	}
 
-	const headers = buildAuthHeaders(encodedBytes, chatURL, {
-		userID,
-		authToken: accessToken,
-		name,
-		email,
-		machineID,
-	});
+	const headers: Record<string, string> = {
+		"Content-Type": "application/json",
+		Accept: "text/event-stream",
+		Authorization: `Bearer ${accessToken}`,
+		"User-Agent": "pi-free-providers",
+	};
 
-	const modelSource = modelConfig.source || "system";
-
-	const response = await fetch(chatURL, {
+	const response = await fetch(QODER_CHAT_URL, {
 		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-			Accept: "text/event-stream",
-			"Cache-Control": "no-cache",
-			"Accept-Encoding": "identity",
-			"X-Model-Key": qoderModel,
-			"X-Model-Source": modelSource as string,
-			...headers,
-		},
-		body: encodedBytes,
+		headers,
+		body: Buffer.from(JSON.stringify(reqBody)),
 		signal,
 	});
 
 	if (!response.ok) {
 		const errText = await response.text();
+		console.log(
+			"[QODER-ERROR] status=" + response.status +
+			" token=" + (accessToken || '').substring(0, 50) +
+			" model=" + qoderModel +
+			" response=" + errText,
+		);
 		throw new Error(
-			`Qoder API request failed: ${response.status} ${response.statusText}. Response: ${errText}`,
+			`Qoder API request failed: ${response.status} ${response.statusText} at ${QODER_CHAT_URL}. Token: ${(accessToken || '').substring(0, 30)}. Model: ${qoderModel}. Body: ${JSON.stringify(reqBody).substring(0, 200)}. Response: ${errText}`,
 		);
 	}
 
@@ -437,12 +418,10 @@ async function fetchQoderStream(
 	return body;
 }
 
-// ─── Stream handler ──────────────────────────────────────────────────────────
+// =============================================================================
+// Stream handler (Pi `streamSimple` implementation)
+// =============================================================================
 
-/**
- * Main streaming handler for Qoder API requests.
- * This is passed as the `streamSimple` option in `pi.registerProvider`.
- */
 export function streamQoder(
 	model: Model<Api>,
 	context: Context,
@@ -485,85 +464,6 @@ export function streamQoder(
 	return stream;
 }
 
-interface StreamSetup {
-	accessToken: string;
-	qoderModel: string;
-	modelConfig: Record<string, unknown>;
-	normalizedMessages: unknown[];
-	lastUserText: string;
-	systemText: string;
-	maxTokens: number;
-	toolsRaw: unknown;
-	recordID: string;
-	userID: string;
-	name: string;
-	email: string;
-	machineID: string;
-}
-
-function buildStreamSetup(
-	model: Model<Api>,
-	context: Context,
-	options: SimpleStreamOptions | undefined,
-): StreamSetup {
-	const accessToken = options?.apiKey;
-	if (!accessToken) {
-		throw new Error(
-			"Qoder credentials not set. Run /login qoder or set QODER_PERSONAL_ACCESS_TOKEN.",
-		);
-	}
-
-	const cachedCreds = getCachedCredentials();
-	const userID = cachedCreds?.userID || "qoder-user";
-	const name = cachedCreds?.name || "Qoder User";
-	const email = cachedCreds?.email || "user@qoder.com";
-	const machineID = cachedCreds?.machineID || getMachineId();
-
-	const qoderModel = model.id;
-	const modelConfig = getCachedModelConfig(qoderModel) || {
-		key: qoderModel,
-		is_reasoning: isReasoningModel(qoderModel),
-		max_output_tokens: 32768,
-		source: "system",
-	};
-	modelConfig.key = qoderModel;
-
-	const maxOutputTokens = modelConfig.max_output_tokens || 32768;
-
-	const normalizedMessages = transformMessagesForQoder(context.messages);
-	const systemText = context.systemPrompt || "";
-	const lastUserText = extractLastUserText(normalizedMessages);
-
-	const maxTokens = resolveMaxTokens(maxOutputTokens, options?.maxTokens);
-
-	const toolsRaw =
-		context.tools && context.tools.length > 0
-			? transformTools(context.tools)
-			: undefined;
-	const recordID = stableChatRecordID(
-		qoderModel,
-		normalizedMessages,
-		toolsRaw,
-		maxTokens,
-	);
-
-	return {
-		accessToken,
-		qoderModel,
-		modelConfig,
-		normalizedMessages,
-		lastUserText,
-		systemText,
-		maxTokens,
-		toolsRaw,
-		recordID,
-		userID,
-		name,
-		email,
-		machineID,
-	};
-}
-
 async function runStream(
 	output: AssistantMessage,
 	stream: AssistantMessageEventStream,
@@ -586,6 +486,7 @@ async function runStream(
 			thinkingBlockIndex: -1,
 			toolCallsState: [],
 			thinkingParser,
+			hasReasoningContent: false,
 		};
 
 		stream.push({ type: "start", partial: output });
@@ -635,7 +536,9 @@ async function runStream(
 	}
 }
 
-// ─── Small pure helpers ──────────────────────────────────────────────────────
+// =============================================================================
+// Small pure helpers
+// =============================================================================
 
 function isReasoningModel(modelId: string): boolean {
 	return (
@@ -644,21 +547,6 @@ function isReasoningModel(modelId: string): boolean {
 		modelId.includes("dmodel") ||
 		modelId.includes("dfmodel")
 	);
-}
-
-function extractLastUserText(
-	messages: Array<{ role?: string; content?: unknown }>,
-): string {
-	for (let i = messages.length - 1; i >= 0; i--) {
-		const msg = messages[i];
-		if (msg?.role !== "user") continue;
-		const content = msg.content;
-		if (typeof content === "string") return content;
-		if (Array.isArray(content)) {
-			return content.map((c) => ("text" in c ? c.text : "")).join("");
-		}
-	}
-	return "";
 }
 
 function resolveMaxTokens(maxOutputTokens: number, requested?: number): number {
