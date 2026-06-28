@@ -155,9 +155,13 @@ jobs:
 
       - name: Create and push tag
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git tag "$TAG"
-          git push origin "$TAG"
+          REMOTE="https://x-access-token:${GH_TOKEN}@github.com"
+          REMOTE="$REMOTE/${GITHUB_REPOSITORY}.git"
+          git push "$REMOTE" "$TAG"
 
       - name: Extract release notes from CHANGELOG
         env:
