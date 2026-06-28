@@ -83,7 +83,7 @@ export const BASE_URL_BAI = "https://api.b.ai/v1";
  * NOT include `/v1`. See {@link PROVIDER_OPENMODEL}.
  */
 export const BASE_URL_OPENMODEL = "https://api.openmodel.ai";
-export const BASE_URL_QODER = "https://api3.qoder.sh";
+export const BASE_URL_QODER = "https://api2-v2.qoder.sh";
 
 /** Cline fetches free models from OpenRouter */
 export const BASE_URL_OPENROUTER = "https://openrouter.ai/api/v1";

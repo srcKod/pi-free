@@ -41,7 +41,7 @@ type QoderContent = string | Array<QoderTextPart | QoderImagePart>;
 
 /** OpenAI-style message sent to the Qoder API. */
 interface QoderMessage {
-	role: "user" | "assistant" | "tool";
+	role: "user" | "assistant" | "tool" | "system";
 	content: QoderContent | null;
 	tool_calls?: QoderToolCall[];
 	tool_call_id?: string;
@@ -150,7 +150,10 @@ function transformAssistantMessage(am: AssistantMessage): QoderMessage {
 			if (block.type === "text") {
 				content += (block as TextContent).text;
 			} else if (block.type === "thinking") {
-				content += `<thinking>${(block as ThinkingContent).thinking}</thinking>\n\n`;
+				// Skip sending previous thinking blocks for the OpenAI-compatible API.
+				// Qoder current API produces reasoning_content natively during streaming;
+				// re-emitting prior reasoning as <thinking> tags is unnecessary and
+				// can confuse newer model versions.
 			} else if (block.type === "toolCall") {
 				const tc = block as ToolCall;
 				toolCalls.push({

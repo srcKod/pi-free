@@ -20,6 +20,7 @@ import {
 	PROVIDER_OPENCODE,
 	PROVIDER_OPENMODEL,
 	PROVIDER_OPENROUTER,
+	PROVIDER_QODER,
 	PROVIDER_ROUTEWAY,
 	PROVIDER_TOKENROUTER,
 	PROVIDER_ZENMUX,
@@ -39,6 +40,7 @@ export {
 	PROVIDER_MODAL,
 	PROVIDER_OPENCODE,
 	PROVIDER_OPENROUTER,
+	PROVIDER_QODER,
 	PROVIDER_QWEN,
 	PROVIDER_ROUTEWAY,
 	PROVIDER_TOKENROUTER,
@@ -97,6 +99,7 @@ interface PiFreeConfig {
 	openmodel_show_paid?: boolean;
 	openrouter_show_paid?: boolean;
 	opencode_show_paid?: boolean;
+	qoder_show_paid?: boolean;
 }
 
 const CONFIG_TEMPLATE: PiFreeConfig = {
@@ -139,6 +142,7 @@ const CONFIG_TEMPLATE: PiFreeConfig = {
 	openmodel_show_paid: false,
 	openrouter_show_paid: false,
 	opencode_show_paid: false,
+	qoder_show_paid: false,
 };
 
 const CONFIG_PATH = join(PI_DATA_DIR, "free.json");
@@ -325,6 +329,7 @@ const PROVIDER_META: readonly ProviderMeta[] = [
 		prefix: "OPENCODE",
 		showPaidKey: "opencode_show_paid",
 	},
+	{ id: PROVIDER_QODER, prefix: "QODER", showPaidKey: "qoder_show_paid" },
 ];
 
 const PROVIDER_META_BY_ID = new Map(PROVIDER_META.map((m) => [m.id, m]));

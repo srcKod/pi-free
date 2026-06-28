@@ -1,19 +1,28 @@
 /**
  * Qoder model definitions and cache management.
  *
- * Qoder provides a static set of models (all at zero cost) with the option
- * to dynamically discover more from the `/algo/api/v2/model/list` endpoint.
- * The dynamic list is cached at `~/.pi/agent/qoder-models-cache.json` with
- * a 1-hour TTL and falls back to the static models on cache miss or API error.
+ * Qoder operates on a credits-based pricing model:
+ *   - Community Edition (free): basic models with daily message limits
+ *   - Pro / Pro+ / Ultra (paid): premium models via monthly credits
  *
- * ALL Qoder models are free — no pricing data needed.
+ * The dynamic model list API is currently unavailable (legacy api3 endpoint
+ * is decommissioned). We keep a static curated list and classify models as
+ * basic (free tier) or premium (paid credits) by model ID.
+ *
+ * Dynamic model discovery is disabled until Qoder publishes a model-list
+ * endpoint on api2-v2. Stale legacy cache entries are ignored and static
+ * models in `staticModels` remain the source of truth.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import type { ProviderModelConfig } from "@earendil-works/pi-coding-agent";
-import { buildAuthHeaders } from "./cosy.ts";
+import { createLogger } from "../../lib/logger.ts";
+
+const _logger = createLogger("qoder");
+
+export type QoderModelConfig = ProviderModelConfig;
 
 // ─── Cache ───────────────────────────────────────────────────────────────────
 
@@ -26,14 +35,29 @@ const ZERO_COST = Object.freeze({
 	cacheWrite: 0,
 });
 
+// ─── Basic (free-tier) model IDs ─────────────────────────────────────────────
+// These are the Qoder-branded router models available on Community Edition.
+// Named models (DeepSeek, Qwen, GLM, Kimi, MiniMax) are premium and cost credits.
+// This set is the single source of truth for basic-model classification.
+const BASIC_MODEL_IDS = new Set([
+	"auto",
+	"ultimate",
+	"performance",
+	"efficient",
+	"lite",
+]);
+
 // ─── Static model list ───────────────────────────────────────────────────────
 
 /**
  * Static model definitions for Qoder.
- * All models are free (zero cost) — no paid tier exists.
- * These serve as the fallback when the dynamic API is unreachable.
+ * Basic models (free tier) are identified by membership in BASIC_MODEL_IDS.
+ * Premium models consume credits and require a paid plan.
+ *
+ * Model IDs are validated against the live api2-v2 endpoint; invalid IDs
+ * (dfmodel, gm51model, qmodel_latest) are excluded here.
  */
-export const staticModels: ProviderModelConfig[] = [
+export const staticModels: QoderModelConfig[] = [
 	{
 		id: "auto",
 		name: "Qoder Auto",
@@ -89,39 +113,12 @@ export const staticModels: ProviderModelConfig[] = [
 		maxTokens: 32_768,
 	},
 	{
-		id: "qmodel_latest",
-		name: "Qwen3.7 Max (Qoder)",
-		reasoning: false,
-		input: ["text", "image"] as ("text" | "image")[],
-		cost: ZERO_COST,
-		contextWindow: 1_000_000,
-		maxTokens: 32_768,
-	},
-	{
 		id: "dmodel",
 		name: "DeepSeek V4 Pro (Qoder)",
 		reasoning: true,
 		input: ["text", "image"] as ("text" | "image")[],
 		cost: ZERO_COST,
 		contextWindow: 1_000_000,
-		maxTokens: 32_768,
-	},
-	{
-		id: "dfmodel",
-		name: "DeepSeek V4 Flash (Qoder)",
-		reasoning: true,
-		input: ["text", "image"] as ("text" | "image")[],
-		cost: ZERO_COST,
-		contextWindow: 1_000_000,
-		maxTokens: 32_768,
-	},
-	{
-		id: "gm51model",
-		name: "GLM 5.1 (Qoder)",
-		reasoning: true,
-		input: ["text", "image"] as ("text" | "image")[],
-		cost: ZERO_COST,
-		contextWindow: 180_000,
 		maxTokens: 32_768,
 	},
 	{
@@ -144,74 +141,30 @@ export const staticModels: ProviderModelConfig[] = [
 	},
 ];
 
-// ─── Dynamic model API ───────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-interface QoderModelEntry {
-	key?: string;
-	enable?: boolean;
-	display_name?: string;
-	max_input_tokens?: number;
-	max_output_tokens?: number;
-	context_config?: Record<string, { token_count?: number }>;
-	is_vl?: boolean;
-	is_reasoning?: boolean;
-	thinking_config?: { enabled?: { efforts?: unknown } };
-	source?: string;
-	[key: string]: unknown;
+/** Check if a model is a basic (free-tier) model. */
+export function isBasicModel(model: ProviderModelConfig): boolean {
+	return BASIC_MODEL_IDS.has(model.id);
 }
 
 // ─── Cache management ────────────────────────────────────────────────────────
 
-function modelEntryToConfig(
-	entry: QoderModelEntry,
-): ProviderModelConfig | null {
-	const key = entry.key;
-	if (!key || !entry.enable) return null;
-
-	const display = entry.display_name || key;
-	const ctxLen = resolveContextLength(entry);
-	const isVL = Boolean(entry.is_vl);
-	const isReasoning = Boolean(entry.is_reasoning) || Boolean(entry.thinking_config);
-	const input: ("text" | "image")[] = isVL ? ["text", "image"] : ["text"];
-
-	return {
-		id: key,
-		name: display,
-		reasoning: isReasoning,
-		input,
-		cost: ZERO_COST,
-		contextWindow: ctxLen,
-		maxTokens: entry.max_output_tokens || 32_768,
-	};
-}
-
-function resolveContextLength(entry: QoderModelEntry): number {
-	let ctxLen = entry.max_input_tokens || 180_000;
-	if (entry.context_config && typeof entry.context_config === "object") {
-		for (const val of Object.values(entry.context_config)) {
-			if (
-				val &&
-				typeof val === "object" &&
-				typeof (val as Record<string, unknown>).token_count === "number"
-			) {
-				const tc = (val as Record<string, number>).token_count;
-				if (tc > ctxLen) ctxLen = tc;
-			}
-		}
-	}
-	return ctxLen;
-}
-
 /** Get models from cache, falling back to static models. */
-export function getCachedModels(): ProviderModelConfig[] {
-	if (existsSync(CACHE_PATH)) {
+export function getCachedModels(): QoderModelConfig[] {
+	if (existsSync(CACHE_PATH) && !isCacheStale()) {
 		try {
 			const data = JSON.parse(readFileSync(CACHE_PATH, "utf8"));
 			if (data && Array.isArray(data.models)) {
-				return data.models as ProviderModelConfig[];
+				return data.models as QoderModelConfig[];
 			}
-		} catch {
-			// Fall through to static
+		} catch (err) {
+			_logger.warn(
+				"Failed to read Qoder model cache; falling back to static models",
+				{
+					error: err instanceof Error ? err.message : String(err),
+				},
+			);
 		}
 	}
 	return staticModels;
@@ -224,81 +177,11 @@ export function isCacheStale(): boolean {
 		const data = JSON.parse(readFileSync(CACHE_PATH, "utf8"));
 		if (!data || typeof data.updatedAt !== "number") return true;
 		return Date.now() - data.updatedAt > 3_600_000; // 1 hour
-	} catch {
+	} catch (err) {
+		_logger.warn("Failed to check Qoder cache staleness; treating as stale", {
+			error: err instanceof Error ? err.message : String(err),
+		});
 		return true;
-	}
-}
-
-/**
- * Fetch available models from Qoder's dynamic model list API and cache them.
- * Falls back silently if the API is unreachable.
- */
-export async function updateQoderModelsCache(
-	authToken: string,
-	userID: string,
-	name: string,
-	email: string,
-): Promise<void> {
-	const modelListURL = "https://api3.qoder.sh/algo/api/v2/model/list";
-	try {
-		const headers = buildAuthHeaders(null, modelListURL, {
-			userID,
-			authToken,
-			name,
-			email,
-		});
-
-		const response = await fetch(modelListURL, {
-			method: "GET",
-			headers: {
-				Accept: "application/json",
-				...headers,
-			},
-		});
-
-		if (!response.ok) return;
-
-		const resData = (await response.json()) as {
-			chat?: QoderModelEntry[];
-		};
-		const chatModels = resData.chat || [];
-		if (chatModels.length === 0) return;
-
-		const newModels: ProviderModelConfig[] = [];
-		const configs: Record<string, QoderModelEntry> = {};
-
-		for (const entry of chatModels) {
-			const model = modelEntryToConfig(entry);
-			if (!model) continue;
-			configs[model.id] = entry;
-			newModels.push(model);
-		}
-
-		if (newModels.length === 0) return;
-
-		// Ensure the auto router model is present
-		if (!newModels.some((m) => m.id === "auto")) {
-			newModels.unshift({
-				id: "auto",
-				name: "Qoder Auto",
-				reasoning: true,
-				input: ["text", "image"] as ("text" | "image")[],
-				cost: ZERO_COST,
-				contextWindow: 180_000,
-				maxTokens: 32_768,
-			});
-		}
-
-		const cacheData = {
-			updatedAt: Date.now(),
-			models: newModels,
-			configs,
-		};
-
-		mkdirSync(dirname(CACHE_PATH), { recursive: true });
-		writeFileSync(CACHE_PATH, JSON.stringify(cacheData, null, 2), "utf-8");
-	} catch {
-		// Best-effort
 	}
 }
 
@@ -306,15 +189,20 @@ export async function updateQoderModelsCache(
  * Get the cached model config for a specific model key.
  * Used to determine per-model settings (reasoning, max tokens, etc.) at stream time.
  */
-export function getCachedModelConfig(modelKey: string): QoderModelEntry | null {
-	if (existsSync(CACHE_PATH)) {
+export function getCachedModelConfig(
+	modelKey: string,
+): Record<string, unknown> | null {
+	if (existsSync(CACHE_PATH) && !isCacheStale()) {
 		try {
 			const data = JSON.parse(readFileSync(CACHE_PATH, "utf8"));
 			if (data?.configs?.[modelKey]) {
-				return data.configs[modelKey] as QoderModelEntry;
+				return data.configs[modelKey] as Record<string, unknown>;
 			}
-		} catch {
-			// Fall through
+		} catch (err) {
+			_logger.warn("Failed to read Qoder model config cache", {
+				modelKey,
+				error: err instanceof Error ? err.message : String(err),
+			});
 		}
 	}
 	return null;
