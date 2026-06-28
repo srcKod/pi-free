@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.5] - 2026-06-28
+
+### Fixed
+
+- **Qoder api2-v2 migration** — Move Qoder to the OpenAI-compatible `https://api2-v2.qoder.sh/model/v1/chat/completions` endpoint, replacing the legacy proxy-style request path. Streaming and non-streaming responses are normalized through the shared stream wrapper, stale legacy model cache entries are ignored, and Qoder now uses the standard basic/all toggle state instead of bespoke toggle logic. The provider avoids logging request bodies or credentials, clamps `max_tokens` to a valid positive value, propagates SSE error payloads, and guards against unbounded SSE buffers. Live validation confirmed the `lite` model works with saved Qoder auth; other account-gated models returned provider quota errors rather than protocol failures ([#285](https://github.com/apmantza/pi-free/pull/285)).
+
+- **OpenCode built-in toggle before registry load** — `/toggle-opencode` and `/toggle-opencode-go` now fall back to direct `/models` discovery with saved OpenCode credentials when Pi's built-in model registry has not populated yet, instead of warning `models not loaded yet. Start a session first.` OpenCode-discovered models preserve the dynamic stream wrapper and are run through `isFreeModel` with the full model set so only `*-free` models are marked free; non-free models no longer appear as free in the picker just because OpenCode's model-list endpoint omits pricing ([#286](https://github.com/apmantza/pi-free/pull/286), [#287](https://github.com/apmantza/pi-free/pull/287)).
+
 ## [2.2.4] - 2026-06-27
 
 ### Added
