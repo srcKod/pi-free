@@ -21,7 +21,7 @@ vi.mock("../constants.ts", () => ({
 }));
 
 vi.mock("../config.ts", () => ({
-	getQoderShowPaid: () => mockGetQoderShowPaid(),
+	getProviderShowPaid: () => mockGetQoderShowPaid(),
 	saveConfig: vi.fn(),
 }));
 
@@ -42,16 +42,54 @@ vi.mock("../providers/qoder/auth.ts", () => ({
 	refreshQoderToken: (...args: unknown[]) => mockRefreshQoderToken(...args),
 }));
 
-vi.mock("../providers/qoder/models.ts", () => ({
-	getCachedModels: () => mockGetCachedModels(),
-	isCacheStale: () => mockIsCacheStale(),
-	updateQoderModelsCache: (...args: unknown[]) =>
-		mockUpdateQoderModelsCache(...args),
-	getCachedModelConfig: vi.fn(),
-	isBasicModel: (m: { _isBasic?: boolean }) => m._isBasic === true,
-}));
+vi.mock("../providers/qoder/models.ts", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../providers/qoder/models.ts")>();
+	return {
+		...actual,
+		getCachedModels: () => mockGetCachedModels(),
+		isCacheStale: () => mockIsCacheStale(),
+		updateQoderModelsCache: (...args: unknown[]) =>
+			mockUpdateQoderModelsCache(...args),
+		getCachedModelConfig: vi.fn(),
+		isBasicModel: (m: { id: string }) =>
+			["auto", "ultimate", "performance", "efficient", "lite"].includes(m.id),
+	};
+});
 
 import qoderProvider from "../providers/qoder/qoder.ts";
+import { isBasicModel, staticModels } from "../providers/qoder/models.ts";
+
+describe("Qoder model classification", () => {
+	it("classifies basic router models correctly", () => {
+		for (const id of ["auto", "ultimate", "performance", "efficient", "lite"]) {
+			const model = staticModels.find((m) => m.id === id);
+			expect(model).toBeDefined();
+			expect(isBasicModel(model!)).toBe(true);
+		}
+	});
+
+	it("classifies premium named models as non-basic", () => {
+		for (const id of ["qmodel", "dmodel", "kmodel", "mmodel"]) {
+			const model = staticModels.find((m) => m.id === id);
+			expect(model).toBeDefined();
+			expect(isBasicModel(model!)).toBe(false);
+		}
+	});
+
+	it("classifies unknown models as non-basic", () => {
+		expect(
+			isBasicModel({
+				id: "unknown-model",
+				name: "Unknown",
+				reasoning: false,
+				input: ["text"],
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+				contextWindow: 1000,
+				maxTokens: 100,
+			}),
+		).toBe(false);
+	});
+});
 
 describe("Qoder Provider", () => {
 	let mockPi: ExtensionAPI;
@@ -68,7 +106,6 @@ describe("Qoder Provider", () => {
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 			contextWindow: 180_000,
 			maxTokens: 32_768,
-			_isBasic: true,
 		},
 		{
 			id: "lite",
@@ -78,9 +115,8 @@ describe("Qoder Provider", () => {
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 			contextWindow: 180_000,
 			maxTokens: 32_768,
-			_isBasic: true,
 		},
-	];
+];
 
 	const premiumModels = [
 		{
@@ -91,7 +127,6 @@ describe("Qoder Provider", () => {
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 			contextWindow: 1_000_000,
 			maxTokens: 32_768,
-			_isBasic: false,
 		},
 		{
 			id: "dmodel",
@@ -101,9 +136,8 @@ describe("Qoder Provider", () => {
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 			contextWindow: 1_000_000,
 			maxTokens: 32_768,
-			_isBasic: false,
 		},
-	];
+];
 
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -224,7 +258,7 @@ describe("Qoder Provider", () => {
 			);
 			const registeredModels = mockRegisterProvider.mock.calls[0][1].models;
 			expect(registeredModels).toHaveLength(2);
-			expect(registeredModels.every((m: { _isBasic?: boolean }) => m._isBasic)).toBe(true);
+			expect(registeredModels.every((m: { id: string }) => ["auto", "lite"].includes(m.id))).toBe(true);
 		});
 
 		it("should persist paid mode to config", async () => {

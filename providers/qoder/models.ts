@@ -14,15 +14,12 @@
  * api2-v2. Static models in `staticModels` remain the source of truth.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import type { ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 
-// Extend ProviderModelConfig to track basic (free-tier) vs premium models
-export interface QoderModelConfig extends ProviderModelConfig {
-	_isBasic?: boolean;
-}
+export type QoderModelConfig = ProviderModelConfig;
 
 // ─── Cache ───────────────────────────────────────────────────────────────────
 
@@ -52,7 +49,7 @@ const BASIC_MODEL_IDS = new Set([
 
 /**
  * Static model definitions for Qoder.
- * Basic models (free tier) are marked with _isBasic.
+ * Basic models (free tier) are identified by membership in BASIC_MODEL_IDS.
  * Premium models consume credits and require a paid plan.
  *
  * Model IDs are validated against the live api2-v2 endpoint; invalid IDs
@@ -140,78 +137,16 @@ export const staticModels: QoderModelConfig[] = [
 		contextWindow: 1_000_000,
 		maxTokens: 32_768,
 	},
-].map((model) => ({ ...model, _isBasic: BASIC_MODEL_IDS.has(model.id) }));
-
-// ─── Dynamic model API ───────────────────────────────────────────────────────
-
-interface QoderModelEntry {
-	key?: string;
-	enable?: boolean;
-	display_name?: string;
-	max_input_tokens?: number;
-	max_output_tokens?: number;
-	context_config?: Record<string, { token_count?: number }>;
-	is_vl?: boolean;
-	is_reasoning?: boolean;
-	thinking_config?: { enabled?: { efforts?: unknown } };
-	source?: string;
-	[key: string]: unknown;
-}
+];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Check if a model is a basic (free-tier) model. */
 export function isBasicModel(model: ProviderModelConfig): boolean {
-	if ((model as ProviderModelConfig & { _isBasic?: boolean })._isBasic !== undefined) {
-		return (model as ProviderModelConfig & { _isBasic: boolean })._isBasic;
-	}
 	return BASIC_MODEL_IDS.has(model.id);
 }
 
 // ─── Cache management ────────────────────────────────────────────────────────
-
-function modelEntryToConfig(
-	entry: QoderModelEntry,
-): QoderModelConfig | null {
-	const key = entry.key;
-	if (!key || !entry.enable) return null;
-
-	const display = entry.display_name || key;
-	const ctxLen = resolveContextLength(entry);
-	const isVL = Boolean(entry.is_vl);
-	const isReasoning =
-		Boolean(entry.is_reasoning) || Boolean(entry.thinking_config);
-	const input: ("text" | "image")[] = isVL ? ["text", "image"] : ["text"];
-	const basic = BASIC_MODEL_IDS.has(key);
-
-	return {
-		id: key,
-		name: display,
-		reasoning: isReasoning,
-		input,
-		cost: ZERO_COST,
-		contextWindow: ctxLen,
-		maxTokens: entry.max_output_tokens || 32_768,
-		_isBasic: basic,
-	};
-}
-
-function resolveContextLength(entry: QoderModelEntry): number {
-	let ctxLen = entry.max_input_tokens || 180_000;
-	if (entry.context_config && typeof entry.context_config === "object") {
-		for (const val of Object.values(entry.context_config)) {
-			if (
-				val &&
-				typeof val === "object" &&
-				typeof (val as Record<string, unknown>).token_count === "number"
-			) {
-				const tc = (val as Record<string, number>).token_count;
-				if (tc > ctxLen) ctxLen = tc;
-			}
-		}
-	}
-	return ctxLen;
-}
 
 /** Get models from cache, falling back to static models. */
 export function getCachedModels(): QoderModelConfig[] {
@@ -264,12 +199,12 @@ export async function updateQoderModelsCache(
  */
 export function getCachedModelConfig(
 	modelKey: string,
-): QoderModelEntry | null {
+): Record<string, unknown> | null {
 	if (existsSync(CACHE_PATH)) {
 		try {
 			const data = JSON.parse(readFileSync(CACHE_PATH, "utf8"));
 			if (data?.configs?.[modelKey]) {
-				return data.configs[modelKey] as QoderModelEntry;
+				return data.configs[modelKey] as Record<string, unknown>;
 			}
 		} catch {
 			// Fall through

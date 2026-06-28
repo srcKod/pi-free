@@ -25,7 +25,7 @@ import type {
 import * as PiAi from "@earendil-works/pi-ai";
 import { BASE_URL_QODER } from "../../constants.ts";
 import { createLogger } from "../../lib/logger.ts";
-import { getCachedModelConfig } from "./models.ts";
+import { getCachedModelConfig, staticModels } from "./models.ts";
 import { ThinkingTagParser } from "./thinking-parser.ts";
 import { transformMessagesForQoder, transformTools } from "./transform.ts";
 
@@ -275,6 +275,12 @@ async function consumeSSEStream(
 
 		buffer += decoder.decode(value, { stream: true });
 
+		if (buffer.length > MAX_SSE_BUFFER_BYTES) {
+			throw new Error(
+				`Qoder SSE buffer exceeded ${MAX_SSE_BUFFER_BYTES} bytes without a newline; stream appears malformed.`,
+			);
+		}
+
 		while (true) {
 			const lineEnd = buffer.indexOf("\n");
 			if (lineEnd === -1) break;
@@ -295,6 +301,9 @@ async function consumeSSEStream(
 const QODER_CHAT_URL = `${BASE_URL_QODER}/model/v1/chat/completions`;
 
 const logger = createLogger("qoder");
+
+/** Max SSE line buffer size before we treat the stream as malformed. */
+const MAX_SSE_BUFFER_BYTES = 1024 * 1024; // 1 MB
 
 /** Redact a bearer token so it never leaks into logs or error messages. */
 function redactToken(token: string | undefined): string {
@@ -418,11 +427,13 @@ async function fetchQoderStream(
 
 	if (!response.ok) {
 		const errText = await response.text();
+		const truncated = errText.length > 500 ? `${errText.slice(0, 500)}...` : errText;
 		logger.error("[QODER] API request failed", {
 			status: response.status,
 			statusText: response.statusText,
 			model: qoderModel,
-			response: errText,
+			responseLength: errText.length,
+			response: truncated,
 			token: redactToken(accessToken),
 		});
 		throw new Error(
@@ -557,13 +568,12 @@ async function runStream(
 // Small pure helpers
 // =============================================================================
 
+const REASONING_MODEL_IDS = new Set(
+	staticModels.filter((m) => m.reasoning).map((m) => m.id),
+);
+
 function isReasoningModel(modelId: string): boolean {
-	return (
-		modelId === "ultimate" ||
-		modelId === "performance" ||
-		modelId.includes("dmodel") ||
-		modelId.includes("dfmodel")
-	);
+	return REASONING_MODEL_IDS.has(modelId);
 }
 
 function resolveMaxTokens(maxOutputTokens: number, requested?: number): number {

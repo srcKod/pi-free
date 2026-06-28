@@ -53,9 +53,13 @@ vi.mock("../lib/logger.ts", () => ({
 	createLogger: () => mockLogger,
 }));
 
-vi.mock("../providers/qoder/models.ts", () => ({
-	getCachedModelConfig: (...args: unknown[]) => mockGetCachedModelConfig(...args),
-}));
+vi.mock("../providers/qoder/models.ts", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../providers/qoder/models.ts")>();
+	return {
+		...actual,
+		getCachedModelConfig: (...args: unknown[]) => mockGetCachedModelConfig(...args),
+	};
+});
 
 
 
@@ -101,6 +105,48 @@ function contextStub(messages: unknown[] = []) {
 function getMockStream(stream: unknown): MockStreamShape {
 	return stream as unknown as MockStreamShape;
 }
+
+describe("Qoder stream setup", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		mockGetCachedModelConfig.mockReturnValue(null);
+		globalThis.fetch = vi.fn();
+	});
+
+	it("throws when no apiKey is provided", async () => {
+		const stream = streamQoder(
+			modelStub("lite"),
+			contextStub([{ role: "user", content: "Hi" }]),
+			{} as any,
+		);
+
+		const mockStream = getMockStream(stream);
+		await vi.waitFor(() => expect(mockStream.ended).toBe(true));
+
+		const errorEvent = mockStream.events.find((e: any) => e.type === "error");
+		expect(errorEvent).toBeDefined();
+		const err = errorEvent as any;
+		expect(err.error.errorMessage).toContain("credentials not set");
+	});
+
+	it("emits an error event when the network request rejects", async () => {
+		vi.mocked(globalThis.fetch).mockRejectedValue(new Error("Network down"));
+
+		const stream = streamQoder(
+			modelStub("lite"),
+			contextStub([{ role: "user", content: "Hi" }]),
+			{ apiKey: "sk-test" } as any,
+		);
+
+		const mockStream = getMockStream(stream);
+		await vi.waitFor(() => expect(mockStream.ended).toBe(true));
+
+		const errorEvent = mockStream.events.find((e: any) => e.type === "error");
+		expect(errorEvent).toBeDefined();
+		const err = errorEvent as any;
+		expect(err.error.errorMessage).toContain("Network down");
+	});
+});
 
 describe("Qoder stream parsing", () => {
 	beforeEach(() => {

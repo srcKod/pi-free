@@ -446,10 +446,6 @@ export function getOpencodeShowPaid(): boolean {
 	return resolveBool("OPENCODE_SHOW_PAID", loadConfigFile().opencode_show_paid);
 }
 
-export function getQoderShowPaid(): boolean {
-	return resolveBool("QODER_SHOW_PAID", loadConfigFile().qoder_show_paid);
-}
-
 export function getProviderShowPaid(providerId: string): boolean {
 	return resolveShowPaidForProvider(providerId);
 }

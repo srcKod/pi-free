@@ -26,7 +26,7 @@ import type {
 	ProviderModelConfig,
 } from "@earendil-works/pi-coding-agent";
 import { BASE_URL_QODER, PROVIDER_QODER } from "../../constants.ts";
-import { getQoderShowPaid } from "../../config.ts";
+import { getProviderShowPaid } from "../../config.ts";
 import {
 	getCachedModels,
 	isBasicModel,
@@ -54,7 +54,7 @@ export default async function qoderProvider(pi: ExtensionAPI) {
 
 	const toggleState = createToggleState({
 		providerId: PROVIDER_QODER,
-		initialShowPaid: getQoderShowPaid(),
+		initialShowPaid: getProviderShowPaid(PROVIDER_QODER),
 		initialModels: stored,
 	});
 
@@ -110,7 +110,8 @@ export default async function qoderProvider(pi: ExtensionAPI) {
 			basicModels = fresh.filter(isBasicModel);
 			stored.all = allModels;
 			stored.free = basicModels;
-			reRegister(allModels);
+			toggleState.setModels(stored);
+			toggleState.applyCurrent(reRegister);
 			logger.info(`[qoder] Models refreshed: ${allModels.length}`);
 		}
 	};
@@ -121,22 +122,28 @@ export default async function qoderProvider(pi: ExtensionAPI) {
 	// Per-provider toggle: /toggle-qoder (basic free-tier ↔ all models)
 	pi.registerCommand("toggle-qoder", {
 		description: "Toggle between basic (free-tier) and all Qoder models",
-		handler: (_args, ctx) => {
-			const applied = toggleState.toggle(reRegister);
-			const basicCount = stored.free.length;
-			const premiumCount = stored.all.length - basicCount;
-			if (applied.mode === "all") {
-				ctx.ui.notify(
-					`qoder: showing all ${stored.all.length} models (${basicCount} basic, ${premiumCount} premium)`,
-					"info",
-				);
-			} else {
-				ctx.ui.notify(
-					`qoder: showing ${stored.free.length} basic (free-tier) models`,
-					"info",
-				);
+		handler: async (_args, ctx) => {
+			try {
+				const applied = toggleState.toggle(reRegister);
+				const basicCount = stored.free.length;
+				const premiumCount = stored.all.length - basicCount;
+				if (applied.mode === "all") {
+					ctx.ui.notify(
+						`qoder: showing all ${stored.all.length} models (${basicCount} basic, ${premiumCount} premium)`,
+						"info",
+					);
+				} else {
+					ctx.ui.notify(
+						`qoder: showing ${stored.free.length} basic (free-tier) models`,
+						"info",
+					);
+				}
+			} catch (err) {
+				logger.error("[qoder] toggle failed", {
+					error: err instanceof Error ? err.message : String(err),
+				});
+				ctx.ui.notify("qoder: toggle failed", "error");
 			}
-			return Promise.resolve();
 		},
 	});
 
