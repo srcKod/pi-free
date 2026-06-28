@@ -26,6 +26,7 @@ import type {
 	ProviderModelConfig,
 } from "@earendil-works/pi-coding-agent";
 import { BASE_URL_QODER, PROVIDER_QODER } from "../../constants.ts";
+import { getQoderShowPaid } from "../../config.ts";
 import {
 	getCachedModels,
 	isBasicModel,
@@ -37,6 +38,7 @@ import { getCachedCredentials, loginQoder, refreshQoderToken } from "./auth.ts";
 import { streamQoder } from "./stream.ts";
 import { enhanceWithCI } from "../../provider-helper.ts";
 import { registerWithGlobalToggle } from "../../lib/registry.ts";
+import { createToggleState } from "../../lib/toggle-state.ts";
 
 // =============================================================================
 // Extension Entry Point
@@ -49,6 +51,12 @@ export default async function qoderProvider(pi: ExtensionAPI) {
 	let allModels: QoderModelConfig[] = getCachedModels();
 	let basicModels: QoderModelConfig[] = allModels.filter(isBasicModel);
 	const stored = { free: basicModels, all: allModels };
+
+	const toggleState = createToggleState({
+		providerId: PROVIDER_QODER,
+		initialShowPaid: getQoderShowPaid(),
+		initialModels: stored,
+	});
 
 	// ── OAuth config (defined before reRegister so it's always available) ──
 	const oauthConfig = {
@@ -111,31 +119,18 @@ export default async function qoderProvider(pi: ExtensionAPI) {
 	registerWithGlobalToggle(PROVIDER_QODER, stored, (m) => reRegister(m), false);
 
 	// Per-provider toggle: /toggle-qoder (basic free-tier ↔ all models)
-	const getQoderShowPaid = () => {
-		try {
-			return JSON.parse(
-				(process.env.QODER_SHOW_PAID ?? "false").toLowerCase(),
-			);
-		} catch {
-			return false;
-		}
-	};
-	let showPaidModels = getQoderShowPaid();
-
 	pi.registerCommand("toggle-qoder", {
 		description: "Toggle between basic (free-tier) and all Qoder models",
 		handler: (_args, ctx) => {
-			showPaidModels = !showPaidModels;
-			if (showPaidModels) {
-				reRegister(stored.all);
-				const basicCount = stored.free.length;
-				const premiumCount = stored.all.length - basicCount;
+			const applied = toggleState.toggle(reRegister);
+			const basicCount = stored.free.length;
+			const premiumCount = stored.all.length - basicCount;
+			if (applied.mode === "all") {
 				ctx.ui.notify(
 					`qoder: showing all ${stored.all.length} models (${basicCount} basic, ${premiumCount} premium)`,
 					"info",
 				);
 			} else {
-				reRegister(stored.free);
 				ctx.ui.notify(
 					`qoder: showing ${stored.free.length} basic (free-tier) models`,
 					"info",
@@ -144,6 +139,9 @@ export default async function qoderProvider(pi: ExtensionAPI) {
 			return Promise.resolve();
 		},
 	});
+
+	// Initial registration respects the configured show-paid mode.
+	toggleState.applyCurrent(reRegister);
 
 	// If user is already authenticated and cache is stale, refresh at startup
 	// (mirrors kilo/cline pattern: check cache freshness before hitting network)
@@ -160,9 +158,6 @@ export default async function qoderProvider(pi: ExtensionAPI) {
 	} catch {
 		// Best-effort: fall back to cached / static models
 	}
-
-	// Initial registration
-	reRegister(allModels);
 
 	// Refresh models cache on session_start if stale (>1h old)
 	pi.on("session_start", async (_event, ctx) => {

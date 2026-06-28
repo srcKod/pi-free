@@ -9,8 +9,9 @@
  * is decommissioned). We keep a static curated list and classify models as
  * basic (free tier) or premium (paid credits) using `_isBasic`.
  *
- * When the dynamic endpoint returns, `updateQoderModelsCache` will populate
- * the cache; until then, static models are the source of truth.
+ * `updateQoderModelsCache` is currently a no-op placeholder. Dynamic model
+ * discovery is disabled until Qoder publishes a model-list endpoint on
+ * api2-v2. Static models in `staticModels` remain the source of truth.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -37,6 +38,8 @@ const ZERO_COST = Object.freeze({
 // ─── Basic (free-tier) model IDs ─────────────────────────────────────────────
 // These are the Qoder-branded router models available on Community Edition.
 // Named models (DeepSeek, Qwen, GLM, Kimi, MiniMax) are premium and cost credits.
+// This set is the single source of truth for basic-model classification;
+// `staticModels` derives `_isBasic` from it below.
 const BASIC_MODEL_IDS = new Set([
 	"auto",
 	"ultimate",
@@ -64,7 +67,6 @@ export const staticModels: QoderModelConfig[] = [
 		cost: ZERO_COST,
 		contextWindow: 180_000,
 		maxTokens: 32_768,
-		_isBasic: true as const,
 	},
 	{
 		id: "ultimate",
@@ -74,7 +76,6 @@ export const staticModels: QoderModelConfig[] = [
 		cost: ZERO_COST,
 		contextWindow: 1_000_000,
 		maxTokens: 32_768,
-		_isBasic: true as const,
 	},
 	{
 		id: "performance",
@@ -84,7 +85,6 @@ export const staticModels: QoderModelConfig[] = [
 		cost: ZERO_COST,
 		contextWindow: 1_000_000,
 		maxTokens: 32_768,
-		_isBasic: true as const,
 	},
 	{
 		id: "efficient",
@@ -94,7 +94,6 @@ export const staticModels: QoderModelConfig[] = [
 		cost: ZERO_COST,
 		contextWindow: 180_000,
 		maxTokens: 32_768,
-		_isBasic: true as const,
 	},
 	{
 		id: "lite",
@@ -104,7 +103,6 @@ export const staticModels: QoderModelConfig[] = [
 		cost: ZERO_COST,
 		contextWindow: 180_000,
 		maxTokens: 32_768,
-		_isBasic: true as const,
 	},
 	{
 		id: "qmodel",
@@ -114,7 +112,6 @@ export const staticModels: QoderModelConfig[] = [
 		cost: ZERO_COST,
 		contextWindow: 1_000_000,
 		maxTokens: 32_768,
-		_isBasic: false as const,
 	},
 	{
 		id: "dmodel",
@@ -124,7 +121,6 @@ export const staticModels: QoderModelConfig[] = [
 		cost: ZERO_COST,
 		contextWindow: 1_000_000,
 		maxTokens: 32_768,
-		_isBasic: false as const,
 	},
 	{
 		id: "kmodel",
@@ -134,7 +130,6 @@ export const staticModels: QoderModelConfig[] = [
 		cost: ZERO_COST,
 		contextWindow: 256_000,
 		maxTokens: 32_768,
-		_isBasic: false as const,
 	},
 	{
 		id: "mmodel",
@@ -144,9 +139,8 @@ export const staticModels: QoderModelConfig[] = [
 		cost: ZERO_COST,
 		contextWindow: 1_000_000,
 		maxTokens: 32_768,
-		_isBasic: false as const,
 	},
-];
+].map((model) => ({ ...model, _isBasic: BASIC_MODEL_IDS.has(model.id) }));
 
 // ─── Dynamic model API ───────────────────────────────────────────────────────
 
@@ -248,9 +242,12 @@ export function isCacheStale(): boolean {
 
 /**
  * Fetch available models from Qoder's dynamic model list API and cache them.
- * Falls back silently if the API is unreachable or the legacy endpoint
- * returns auth errors (COSY signing is currently incompatible with the
- * new api2-v2 inference endpoint).
+ *
+ * Currently a no-op placeholder: the legacy api3 model-list endpoint required
+ * COSY signing, which is incompatible with the api2-v2 inference endpoint we
+ * now use. Dynamic model discovery is disabled until Qoder publishes a model
+ * list endpoint on api2-v2. Static models in `staticModels` remain the source
+ * of truth.
  */
 export async function updateQoderModelsCache(
 	_authToken: string,
@@ -258,14 +255,7 @@ export async function updateQoderModelsCache(
 	_name: string,
 	_email: string,
 ): Promise<void> {
-	// NOTE: The legacy model list endpoint at api3.qoder.sh requires COSY signing
-	// which is incompatible with the api2-v2 inference endpoint we now use.
-	// Dynamic model discovery is disabled until Qoder publishes a model list
-	// endpoint on api2-v2. Static models in `staticModels` remain the source of truth.
-	//
-	// If you want to re-enable dynamic discovery, implement COSY signing in
-	// stream.ts (like auth.ts does for legacy endpoints) and point this to
-	// the correct api2-v2 model-list path.
+	// Placeholder — re-implement once Qoder exposes an api2-v2 model-list path.
 }
 
 /**

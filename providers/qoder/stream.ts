@@ -10,7 +10,6 @@
  * translating Qoder's response format to Pi's `AssistantMessageEventStream`.
  */
 
-import crypto from "node:crypto";
 import type {
 	Api,
 	AssistantMessage,
@@ -18,13 +17,15 @@ import type {
 	Context,
 	Model,
 	SimpleStreamOptions,
+	StopReason,
 	TextContent,
 	ThinkingContent,
 	ToolCall,
 } from "@earendil-works/pi-ai";
 import * as PiAi from "@earendil-works/pi-ai";
+import { BASE_URL_QODER } from "../../constants.ts";
+import { createLogger } from "../../lib/logger.ts";
 import { getCachedModelConfig } from "./models.ts";
-import { getCachedCredentials } from "./auth.ts";
 import { ThinkingTagParser } from "./thinking-parser.ts";
 import { transformMessagesForQoder, transformTools } from "./transform.ts";
 
@@ -231,25 +232,32 @@ function handleSSELine(
 	const dataStr = line.slice(5).trim();
 	if (dataStr === "[DONE]") return true;
 
+	let parsed: Record<string, unknown>;
 	try {
-		const parsed = JSON.parse(dataStr);
-		if (parsed.error) {
-			throw new Error(
-				parsed.error.message || JSON.stringify(parsed.error),
-			);
-		}
-
-		if (parsed.choices && parsed.choices.length > 0) {
-			const choice = parsed.choices[0];
-			if (choice.delta) {
-				processDelta(state, choice.delta);
-			}
-			if (choice.finish_reason) {
-				state.output.stopReason = choice.finish_reason;
-			}
-		}
+		parsed = JSON.parse(dataStr);
 	} catch {
 		// Skip unparseable SSE lines
+		return false;
+	}
+
+	if (parsed.error) {
+		throw new Error(
+			`Qoder SSE error: ${(parsed.error as { message?: string }).message || JSON.stringify(parsed.error)}`,
+		);
+	}
+
+	if (
+		parsed.choices &&
+		Array.isArray(parsed.choices) &&
+		parsed.choices.length > 0
+	) {
+		const choice = parsed.choices[0] as Record<string, unknown>;
+		if (choice.delta) {
+			processDelta(state, choice.delta as Record<string, unknown>);
+		}
+		if (choice.finish_reason) {
+			state.output.stopReason = choice.finish_reason as StopReason;
+		}
 	}
 	return false;
 }
@@ -284,8 +292,16 @@ async function consumeSSEStream(
 // Request builder (OpenAI-compatible)
 // =============================================================================
 
-const QODER_CHAT_URL =
-	"https://api2-v2.qoder.sh/model/v1/chat/completions";
+const QODER_CHAT_URL = `${BASE_URL_QODER}/model/v1/chat/completions`;
+
+const logger = createLogger("qoder");
+
+/** Redact a bearer token so it never leaks into logs or error messages. */
+function redactToken(token: string | undefined): string {
+	if (!token) return "(none)";
+	if (token.length <= 8) return "***";
+	return `${token.slice(0, 3)}...${token.slice(-3)}`;
+}
 
 interface StreamSetup {
 	accessToken: string;
@@ -341,12 +357,12 @@ function buildStreamSetup(
 			: undefined;
 
 	if (isDebug) {
-		console.log(
-			"[QODER] req endpoint=" + QODER_CHAT_URL +
-			" token=" + accessToken.substring(0, 50) +
-			" model=" + qoderModel +
-			" messages=" + normalizedMessages.length,
-		);
+		logger.info("[QODER] streaming request", {
+			endpoint: QODER_CHAT_URL,
+			model: qoderModel,
+			messages: normalizedMessages.length,
+			token: redactToken(accessToken),
+		});
 	}
 
 	return {
@@ -382,7 +398,7 @@ async function fetchQoderStream(
 		reqBody.tools = toolsRaw;
 	}
 
-	if (maxTokens < 32768) {
+	if (maxTokens > 0) {
 		reqBody.max_tokens = maxTokens;
 	}
 
@@ -402,14 +418,15 @@ async function fetchQoderStream(
 
 	if (!response.ok) {
 		const errText = await response.text();
-		console.log(
-			"[QODER-ERROR] status=" + response.status +
-			" token=" + (accessToken || '').substring(0, 50) +
-			" model=" + qoderModel +
-			" response=" + errText,
-		);
+		logger.error("[QODER] API request failed", {
+			status: response.status,
+			statusText: response.statusText,
+			model: qoderModel,
+			response: errText,
+			token: redactToken(accessToken),
+		});
 		throw new Error(
-			`Qoder API request failed: ${response.status} ${response.statusText} at ${QODER_CHAT_URL}. Token: ${(accessToken || '').substring(0, 30)}. Model: ${qoderModel}. Body: ${JSON.stringify(reqBody).substring(0, 200)}. Response: ${errText}`,
+			`Qoder API request failed: ${response.status} ${response.statusText} at ${QODER_CHAT_URL}. Model: ${qoderModel}.`,
 		);
 	}
 
