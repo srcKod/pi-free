@@ -43,7 +43,8 @@ vi.mock("../providers/qoder/auth.ts", () => ({
 }));
 
 vi.mock("../providers/qoder/models.ts", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("../providers/qoder/models.ts")>();
+	const actual =
+		await importOriginal<typeof import("../providers/qoder/models.ts")>();
 	return {
 		...actual,
 		getCachedModels: () => mockGetCachedModels(),
@@ -116,7 +117,7 @@ describe("Qoder Provider", () => {
 			contextWindow: 180_000,
 			maxTokens: 32_768,
 		},
-];
+	];
 
 	const premiumModels = [
 		{
@@ -137,12 +138,14 @@ describe("Qoder Provider", () => {
 			contextWindow: 1_000_000,
 			maxTokens: 32_768,
 		},
-];
+	];
 
 	beforeEach(() => {
 		vi.clearAllMocks();
 		mockGetQoderShowPaid.mockReset().mockReturnValue(false);
-		mockGetCachedModels.mockReset().mockReturnValue([...basicModels, ...premiumModels]);
+		mockGetCachedModels
+			.mockReset()
+			.mockReturnValue([...basicModels, ...premiumModels]);
 		mockIsCacheStale.mockReset().mockReturnValue(false);
 		mockUpdateQoderModelsCache.mockReset().mockResolvedValue(undefined);
 		mockGetCachedCredentials.mockReset().mockReturnValue(null);
@@ -156,9 +159,11 @@ describe("Qoder Provider", () => {
 		capturedToggleArgs = [];
 
 		mockRegisterProvider = vi.fn();
-		mockRegisterCommand = vi.fn((name: string, config: { handler: Function }) => {
-			commandHandlers[name] = config.handler;
-		});
+		mockRegisterCommand = vi.fn(
+			(name: string, config: { handler: Function }) => {
+				commandHandlers[name] = config.handler;
+			},
+		);
 		commandHandlers = {};
 
 		mockPi = {
@@ -186,8 +191,12 @@ describe("Qoder Provider", () => {
 
 			const registeredModels = mockRegisterProvider.mock.calls[0][1].models;
 			expect(registeredModels).toHaveLength(2);
-			expect(registeredModels.some((m: { id: string }) => m.id === "qmodel")).toBe(false);
-			expect(registeredModels.some((m: { id: string }) => m.id === "dmodel")).toBe(false);
+			expect(
+				registeredModels.some((m: { id: string }) => m.id === "qmodel"),
+			).toBe(false);
+			expect(
+				registeredModels.some((m: { id: string }) => m.id === "dmodel"),
+			).toBe(false);
 		});
 
 		it("should register all models when QODER_SHOW_PAID is true", async () => {
@@ -197,8 +206,12 @@ describe("Qoder Provider", () => {
 
 			const registeredModels = mockRegisterProvider.mock.calls[0][1].models;
 			expect(registeredModels).toHaveLength(4);
-			expect(registeredModels.some((m: { id: string }) => m.id === "qmodel")).toBe(true);
-			expect(registeredModels.some((m: { id: string }) => m.id === "dmodel")).toBe(true);
+			expect(
+				registeredModels.some((m: { id: string }) => m.id === "qmodel"),
+			).toBe(true);
+			expect(
+				registeredModels.some((m: { id: string }) => m.id === "dmodel"),
+			).toBe(true);
 		});
 
 		it("should register with global toggle system", async () => {
@@ -258,7 +271,11 @@ describe("Qoder Provider", () => {
 			);
 			const registeredModels = mockRegisterProvider.mock.calls[0][1].models;
 			expect(registeredModels).toHaveLength(2);
-			expect(registeredModels.every((m: { id: string }) => ["auto", "lite"].includes(m.id))).toBe(true);
+			expect(
+				registeredModels.every((m: { id: string }) =>
+					["auto", "lite"].includes(m.id),
+				),
+			).toBe(true);
 		});
 
 		it("should persist paid mode to config", async () => {

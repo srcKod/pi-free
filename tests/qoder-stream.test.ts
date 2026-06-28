@@ -2,7 +2,10 @@
  * Qoder stream parsing tests.
  */
 
-import type { AssistantMessage, AssistantMessageEvent } from "@earendil-works/pi-ai";
+import type {
+	AssistantMessage,
+	AssistantMessageEvent,
+} from "@earendil-works/pi-ai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 interface MockStreamShape {
@@ -54,14 +57,14 @@ vi.mock("../lib/logger.ts", () => ({
 }));
 
 vi.mock("../providers/qoder/models.ts", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("../providers/qoder/models.ts")>();
+	const actual =
+		await importOriginal<typeof import("../providers/qoder/models.ts")>();
 	return {
 		...actual,
-		getCachedModelConfig: (...args: unknown[]) => mockGetCachedModelConfig(...args),
+		getCachedModelConfig: (...args: unknown[]) =>
+			mockGetCachedModelConfig(...args),
 	};
 });
-
-
 
 vi.mock("../providers/qoder/transform.ts", () => ({
 	transformMessagesForQoder: (messages: unknown[]) => messages,
@@ -240,7 +243,9 @@ describe("Qoder stream parsing", () => {
 		const mockStream = getMockStream(stream);
 		await vi.waitFor(() => expect(mockStream.ended).toBe(true));
 
-		const toolcallEnds = mockStream.events.filter((e: any) => e.type === "toolcall_end");
+		const toolcallEnds = mockStream.events.filter(
+			(e: any) => e.type === "toolcall_end",
+		);
 		expect(toolcallEnds).toHaveLength(1);
 		const endEvent = toolcallEnds[0] as any;
 		expect(endEvent.toolCall).toMatchObject({

@@ -7,17 +7,20 @@
  *
  * The dynamic model list API is currently unavailable (legacy api3 endpoint
  * is decommissioned). We keep a static curated list and classify models as
- * basic (free tier) or premium (paid credits) using `_isBasic`.
+ * basic (free tier) or premium (paid credits) by model ID.
  *
- * `updateQoderModelsCache` is currently a no-op placeholder. Dynamic model
- * discovery is disabled until Qoder publishes a model-list endpoint on
- * api2-v2. Static models in `staticModels` remain the source of truth.
+ * Dynamic model discovery is disabled until Qoder publishes a model-list
+ * endpoint on api2-v2. Stale legacy cache entries are ignored and static
+ * models in `staticModels` remain the source of truth.
  */
 
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ProviderModelConfig } from "@earendil-works/pi-coding-agent";
+import { createLogger } from "../../lib/logger.ts";
+
+const _logger = createLogger("qoder");
 
 export type QoderModelConfig = ProviderModelConfig;
 
@@ -35,8 +38,7 @@ const ZERO_COST = Object.freeze({
 // ─── Basic (free-tier) model IDs ─────────────────────────────────────────────
 // These are the Qoder-branded router models available on Community Edition.
 // Named models (DeepSeek, Qwen, GLM, Kimi, MiniMax) are premium and cost credits.
-// This set is the single source of truth for basic-model classification;
-// `staticModels` derives `_isBasic` from it below.
+// This set is the single source of truth for basic-model classification.
 const BASIC_MODEL_IDS = new Set([
 	"auto",
 	"ultimate",
@@ -150,14 +152,19 @@ export function isBasicModel(model: ProviderModelConfig): boolean {
 
 /** Get models from cache, falling back to static models. */
 export function getCachedModels(): QoderModelConfig[] {
-	if (existsSync(CACHE_PATH)) {
+	if (existsSync(CACHE_PATH) && !isCacheStale()) {
 		try {
 			const data = JSON.parse(readFileSync(CACHE_PATH, "utf8"));
 			if (data && Array.isArray(data.models)) {
 				return data.models as QoderModelConfig[];
 			}
-		} catch {
-			// Fall through to static
+		} catch (err) {
+			_logger.warn(
+				"Failed to read Qoder model cache; falling back to static models",
+				{
+					error: err instanceof Error ? err.message : String(err),
+				},
+			);
 		}
 	}
 	return staticModels;
@@ -170,27 +177,12 @@ export function isCacheStale(): boolean {
 		const data = JSON.parse(readFileSync(CACHE_PATH, "utf8"));
 		if (!data || typeof data.updatedAt !== "number") return true;
 		return Date.now() - data.updatedAt > 3_600_000; // 1 hour
-	} catch {
+	} catch (err) {
+		_logger.warn("Failed to check Qoder cache staleness; treating as stale", {
+			error: err instanceof Error ? err.message : String(err),
+		});
 		return true;
 	}
-}
-
-/**
- * Fetch available models from Qoder's dynamic model list API and cache them.
- *
- * Currently a no-op placeholder: the legacy api3 model-list endpoint required
- * COSY signing, which is incompatible with the api2-v2 inference endpoint we
- * now use. Dynamic model discovery is disabled until Qoder publishes a model
- * list endpoint on api2-v2. Static models in `staticModels` remain the source
- * of truth.
- */
-export async function updateQoderModelsCache(
-	_authToken: string,
-	_userID: string,
-	_name: string,
-	_email: string,
-): Promise<void> {
-	// Placeholder — re-implement once Qoder exposes an api2-v2 model-list path.
 }
 
 /**
@@ -200,14 +192,17 @@ export async function updateQoderModelsCache(
 export function getCachedModelConfig(
 	modelKey: string,
 ): Record<string, unknown> | null {
-	if (existsSync(CACHE_PATH)) {
+	if (existsSync(CACHE_PATH) && !isCacheStale()) {
 		try {
 			const data = JSON.parse(readFileSync(CACHE_PATH, "utf8"));
 			if (data?.configs?.[modelKey]) {
 				return data.configs[modelKey] as Record<string, unknown>;
 			}
-		} catch {
-			// Fall through
+		} catch (err) {
+			_logger.warn("Failed to read Qoder model config cache", {
+				modelKey,
+				error: err instanceof Error ? err.message : String(err),
+			});
 		}
 	}
 	return null;

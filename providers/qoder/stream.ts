@@ -223,10 +223,7 @@ function finalizeToolCalls(state: StreamState): void {
 // SSE parsing (OpenAI-compatible stream)
 // =============================================================================
 
-function handleSSELine(
-	state: StreamState,
-	line: string,
-): boolean {
+function handleSSELine(state: StreamState, line: string): boolean {
 	if (!line.startsWith("data:")) return false;
 
 	const dataStr = line.slice(5).trim();
@@ -389,13 +386,8 @@ async function fetchQoderStream(
 	setup: StreamSetup,
 	signal?: AbortSignal,
 ): Promise<ReadableStream<Uint8Array>> {
-	const {
-		accessToken,
-		qoderModel,
-		normalizedMessages,
-		maxTokens,
-		toolsRaw,
-	} = setup;
+	const { accessToken, qoderModel, normalizedMessages, maxTokens, toolsRaw } =
+		setup;
 
 	const reqBody: Record<string, unknown> = {
 		model: qoderModel,
@@ -427,7 +419,8 @@ async function fetchQoderStream(
 
 	if (!response.ok) {
 		const errText = await response.text();
-		const truncated = errText.length > 500 ? `${errText.slice(0, 500)}...` : errText;
+		const truncated =
+			errText.length > 500 ? `${errText.slice(0, 500)}...` : errText;
 		logger.error("[QODER] API request failed", {
 			status: response.status,
 			statusText: response.statusText,
@@ -519,8 +512,8 @@ async function runStream(
 
 		stream.push({ type: "start", partial: output });
 
-		const reader = await fetchQoderStream(setup, options?.signal).then(
-			(s) => s.getReader(),
+		const reader = await fetchQoderStream(setup, options?.signal).then((s) =>
+			s.getReader(),
 		);
 
 		await consumeSSEStream(state, reader);
